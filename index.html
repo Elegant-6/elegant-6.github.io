@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>NEON TANK · 霓虹坦克大战</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<div class="grid-overlay"></div>
+<div class="scanlines"></div>
+
+<div id="stage">
+  <canvas id="gameCanvas" width="960" height="960"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="hud-top">
+      <div id="hud-player">
+        <img id="hud-avatar" alt="">
+        <div class="bars">
+          <div class="bar-row"><span class="bar-label">HP</span><div class="bar"><div id="hp-bar"></div></div></div>
+          <div class="bar-row"><span class="bar-label">盾</span><div class="bar"><div id="shield-bar"></div></div></div>
+        </div>
+      </div>
+      <div id="hud-center">
+        <div id="wave-info"></div>
+        <div id="boss-bar-wrap">
+          <div class="bar boss"><div id="boss-bar"></div></div>
+          <div id="boss-name"></div>
+        </div>
+      </div>
+      <div id="hud-right">
+        <div id="score">0</div>
+        <div class="label">SCORE</div>
+        <div id="combo"></div>
+      </div>
+    </div>
+    <div class="hud-bottom">
+      <div id="skill-box">
+        <div class="skill-item">
+          <div id="skill-icon">技</div>
+          <div id="skill-cd"></div>
+        </div>
+        <span id="skill-name"></span>
+      </div>
+      <div id="effects-box"></div>
+      <div id="minimap-wrap"><canvas id="minimap" width="140" height="140"></canvas></div>
+    </div>
+    <button id="pause-btn" class="touch-btn touch-pause" aria-label="暂停">II</button>
+    <button id="touch-skill" class="touch-btn touch-skill" aria-label="技能">技</button>
+  </div>
+</div>
+
+<div class="screen" id="screen-menu">
+  <div class="panel">
+    <div class="title">NEON TANK</div>
+    <div class="subtitle">霓 虹 坦 克 大 战</div>
+    <div class="menu-btns">
+      <button class="btn primary" data-action="mode">开始游戏</button>
+      <button class="btn" data-action="leaderboard">排行榜</button>
+      <button class="btn" data-action="settings">设置</button>
+    </div>
+    <div class="tip">WASD / 方向键移动 · 鼠标瞄准 · 左键射击 · 右键 / J / Shift 技能 · P / Esc 暂停 · 触屏：左半屏拖动摇杆移动，右半屏瞄准射击</div>
+  </div>
+</div>
+
+<div class="screen" id="screen-mode">
+  <div class="panel">
+    <div class="panel-title">选择模式</div>
+    <button class="btn primary" data-action="mode-adventure">冒险模式</button>
+    <button class="btn" data-action="mode-endless">无尽模式</button>
+    <button class="btn" data-action="mode-boss">BOSS 挑战</button>
+    <div class="row"><button class="btn ghost" data-action="back-menu">返回</button></div>
+  </div>
+</div>
+
+<div class="screen" id="screen-select">
+  <div class="panel wide">
+    <div class="panel-title">选择坦克</div>
+    <div class="tank-cards" id="tank-cards"></div>
+    <div class="tank-detail" id="tank-detail"></div>
+    <div class="row">
+      <button class="btn ghost" data-action="back-mode">返回</button>
+      <button class="btn primary" data-action="start">出击</button>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="screen-boss">
+  <div class="panel wide">
+    <div class="panel-title">选择 Boss</div>
+    <div class="boss-cards" id="boss-cards"></div>
+    <div class="row">
+      <button class="btn ghost" data-action="back-mode">返回</button>
+      <button class="btn primary" data-action="start-boss">挑战</button>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="screen-leaderboard">
+  <div class="panel">
+    <div class="panel-title">排行榜</div>
+    <div id="lb-list"></div>
+    <div class="row"><button class="btn" data-action="back-menu">返回</button></div>
+  </div>
+</div>
+
+<div class="screen" id="screen-pause">
+  <div class="panel">
+    <div class="panel-title">已暂停</div>
+    <button class="btn primary" data-action="resume">继续</button>
+    <div class="row">
+      <button class="btn" data-action="restart">重新开始</button>
+      <button class="btn ghost" data-action="quit">返回主菜单</button>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="screen-result">
+  <div class="panel">
+    <div class="panel-title" id="result-title"></div>
+    <div id="result-stars"></div>
+    <div class="stats" id="result-stats"></div>
+    <div class="row" id="result-btns"></div>
+  </div>
+</div>
+
+<div class="screen" id="screen-settings">
+  <div class="panel">
+    <div class="panel-title">设置</div>
+    <div class="set-row"><span>音量</span><input type="range" id="set-volume" min="0" max="100" value="50"></div>
+    <div class="set-row"><span>基地防守模式</span><button class="btn small on" id="set-base">开启</button></div>
+    <div class="set-row"><span>重置存档</span><button class="btn small danger" data-action="reset-save">重置</button></div>
+    <div class="row"><button class="btn" data-action="close-settings">关闭</button></div>
+  </div>
+</div>
+
+<div id="banner"></div>
+
+<script src="js/config.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/particles.js"></script>
+<script src="js/input.js"></script>
+<script src="js/map.js"></script>
+<script src="js/bullet.js"></script>
+<script src="js/tank.js"></script>
+<script src="js/item.js"></script>
+<script src="js/boss.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
