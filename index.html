@@ -33,6 +33,7 @@
       <div id="hud-right">
         <div id="score">0</div>
         <div class="label">SCORE</div>
+        <div class="hud-meta"><span id="hud-level">Lv 1</span><span id="hud-gold">金币 0</span></div>
         <div id="combo"></div>
       </div>
     </div>
@@ -59,6 +60,7 @@
     <div class="menu-btns">
       <button class="btn primary" data-action="mode">开始游戏</button>
       <button class="btn" data-action="leaderboard">排行榜</button>
+      <button class="btn" data-action="upgrade">坦克强化</button>
       <button class="btn" data-action="settings">设置</button>
     </div>
     <div class="tip">WASD / 方向键移动 · 鼠标瞄准 · 左键射击 · 右键 / J / Shift 技能 · P / Esc 暂停 · 触屏：左半屏拖动摇杆移动，右半屏瞄准射击</div>
@@ -106,6 +108,19 @@
   </div>
 </div>
 
+<div class="screen" id="screen-upgrade">
+  <div class="panel">
+    <div class="panel-title">坦克强化</div>
+    <div class="set-row"><span>当前等级</span><span id="up-level">Lv 1</span></div>
+    <div class="set-row"><span>拥有金币</span><span id="up-gold">0</span></div>
+    <div class="set-row"><span>下次升级费用</span><span id="up-cost">0</span></div>
+    <div class="set-row"><span>属性加成</span><span id="up-bonus">+0%</span></div>
+    <div class="set-row"><span>强化说明</span><span class="up-hint">每级 生命/攻击 +1%、速度/射速 +0.5%；敌方强化仅为玩家效果的 30%</span></div>
+    <button class="btn primary" id="upgrade-do" data-action="upgrade-do">升级</button>
+    <div class="row"><button class="btn" data-action="back-menu">返回</button></div>
+  </div>
+</div>
+
 <div class="screen" id="screen-pause">
   <div class="panel">
     <div class="panel-title">已暂停</div>
@@ -129,8 +144,8 @@
 <div class="screen" id="screen-settings">
   <div class="panel">
     <div class="panel-title">设置</div>
-    <div class="set-row"><span>音量</span><input type="range" id="set-volume" min="0" max="100" value="50"></div>
     <div class="set-row"><span>基地防守模式</span><button class="btn small on" id="set-base">开启</button></div>
+    <div class="set-row"><span>背景音乐</span><button class="btn small on" id="set-music">开启</button></div>
     <div class="set-row"><span>重置存档</span><button class="btn small danger" data-action="reset-save">重置</button></div>
     <div class="row"><button class="btn" data-action="close-settings">关闭</button></div>
   </div>

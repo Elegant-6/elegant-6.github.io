@@ -1,98 +1,180 @@
-TZ.Audio = (function () {
-  var ctx = null, master = null;
-  var volume = 0.5;
+window.TZ = window.TZ || {};
 
-  var fileSfx = {
-    playerFire: 'assets/audio/player_fire.mp3',
-    enemyHit: 'assets/audio/enemy_hit.mp3'
-  };
-  var fileEls = {};
+(function () {
+  var ctx = null, master = null, musicGain = null, bgm = null, bgmOn = true;
 
   function ensure() {
     if (!ctx) {
       try {
-        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return false;
+        ctx = new AC();
         master = ctx.createGain();
-        master.gain.value = volume;
+        master.gain.value = 0.6;
         master.connect(ctx.destination);
-      } catch (e) { ctx = null; }
+        musicGain = ctx.createGain();
+        musicGain.gain.value = bgmOn ? 0.3 : 0;
+        musicGain.connect(master);
+      } catch (e) { return false; }
     }
-    if (ctx && ctx.state === 'suspended') ctx.resume();
+    if (ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
+    return true;
   }
 
-  function tone(freq, dur, type, vol, slideTo) {
-    if (!ctx) return;
-    var o = ctx.createOscillator(), g = ctx.createGain();
+  function unlock() {
+    if (!ensure()) return;
+    if (!bgm) startBGM();
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('pointerdown', unlock);
+    document.addEventListener('keydown', unlock);
+    document.addEventListener('touchend', unlock);
+  }
+
+  function tone(freq, t, dur, type, vol) {
+    var o = ctx.createOscillator();
+    var g = ctx.createGain();
     o.type = type || 'square';
-    o.frequency.setValueAtTime(freq, ctx.currentTime);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), ctx.currentTime + dur);
-    g.gain.setValueAtTime(vol, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g); g.connect(master);
-    o.start();
-    o.stop(ctx.currentTime + dur + 0.02);
+    o.start(t); o.stop(t + dur + 0.03);
   }
 
-  function noise(dur, vol, filterFreq) {
-    if (!ctx) return;
-    var len = Math.floor(ctx.sampleRate * dur);
+  function noise(t, dur, vol, cutoff) {
+    var len = Math.max(1, Math.floor(ctx.sampleRate * dur));
     var buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    var data = buf.getChannelData(0);
-    for (var i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    var src = ctx.createBufferSource(); src.buffer = buf;
-    var f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filterFreq || 1000;
-    var g = ctx.createGain(); g.gain.setValueAtTime(vol, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1);
+    var src = ctx.createBufferSource();
+    src.buffer = buf;
+    var f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = cutoff || 3000;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(f); f.connect(g); g.connect(master);
-    src.start();
+    src.start(t);
   }
 
-  var sfx = {
-    fire:    function () { tone(220, 0.08, 'square', 0.22, 60); },
-    boom:    function () { noise(0.4, 0.45, 900); tone(120, 0.25, 'sawtooth', 0.12, 40); },
-    hit:     function () { noise(0.08, 0.2, 2600); },
-    pickup:  function () { [523, 659, 784].forEach(function (f, i) { setTimeout(function () { tone(f, 0.1, 'sine', 0.16); }, i * 70); }); },
-    triple:  function () { tone(300, 0.12, 'square', 0.14, 900); },
-    nuke:    function () { noise(0.8, 0.55, 500); tone(90, 0.5, 'sawtooth', 0.2, 30); },
-    dash:    function () { tone(200, 0.2, 'sawtooth', 0.16, 950); },
-    shield:  function () { tone(300, 0.25, 'sine', 0.18, 650); tone(500, 0.2, 'sine', 0.12, 900); },
-    warn:    function () { tone(880, 0.18, 'square', 0.26); setTimeout(function () { tone(880, 0.18, 'square', 0.26); }, 200); },
-    laser:   function () { tone(1200, 0.7, 'sawtooth', 0.12, 100); },
-    wave:    function () { tone(523, 0.15, 'sine', 0.18, 1046); },
-    boss:    function () { [400, 300, 400, 300, 900].forEach(function (f, i) { setTimeout(function () { tone(f, 0.15, 'square', 0.2); }, i * 120); }); },
-    click:   function () { tone(650, 0.06, 'square', 0.1); },
-    victory: function () { [523, 659, 784, 1046].forEach(function (f, i) { setTimeout(function () { tone(f, 0.22, 'sine', 0.18); }, i * 130); }); },
-    defeat:  function () { [400, 300, 220, 150].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, 'sawtooth', 0.12); }, i * 180); }); }
+  var SFX = {
+    click:      function (t) { tone(950, t, 0.06, 'square', 0.10); tone(1450, t + 0.03, 0.05, 'square', 0.06); },
+    playerFire: function (t) { tone(900, t, 0.09, 'sawtooth', 0.14); tone(620, t + 0.02, 0.10, 'square', 0.10); noise(t, 0.04, 0.06, 6000); },
+    fire:       function (t) { tone(430, t, 0.11, 'square', 0.12); tone(280, t + 0.02, 0.09, 'sawtooth', 0.08); noise(t, 0.05, 0.04, 2500); },
+    enemyHit:   function (t) { tone(230, t, 0.09, 'square', 0.13); tone(150, t + 0.02, 0.11, 'sawtooth', 0.09); },
+    hit:        function (t) { tone(160, t, 0.14, 'sawtooth', 0.18); noise(t, 0.08, 0.10, 1200); },
+    boom:       function (t) { noise(t, 0.35, 0.30, 900); tone(120, t, 0.30, 'sine', 0.35); tone(70, t + 0.04, 0.32, 'sine', 0.26); },
+    skill:      function (t) { tone(680, t, 0.12, 'sine', 0.18); tone(1040, t + 0.07, 0.14, 'sine', 0.14); tone(1560, t + 0.14, 0.14, 'sine', 0.10); },
+    dash:       function (t) { noise(t, 0.16, 0.12, 5000); tone(640, t, 0.12, 'sawtooth', 0.10); },
+    item:       function (t) { tone(660, t, 0.07, 'sine', 0.14); tone(880, t + 0.06, 0.09, 'sine', 0.12); tone(1320, t + 0.12, 0.12, 'sine', 0.09); },
+    defeat:     function (t) { tone(392, t, 0.22, 'triangle', 0.16); tone(330, t + 0.18, 0.22, 'triangle', 0.16); tone(262, t + 0.36, 0.50, 'triangle', 0.16); },
+    victory:    function (t) { tone(523, t, 0.14, 'triangle', 0.16); tone(659, t + 0.12, 0.14, 'triangle', 0.16); tone(784, t + 0.24, 0.30, 'triangle', 0.18); }
   };
 
-  return {
-    ensure: ensure,
-    setVolume: function (v) {
-      volume = v;
-      if (master) master.gain.value = v;
-      for (var k in fileEls) { try { fileEls[k].volume = v; } catch (e) {} }
-    },
-    play: function (name) {
-      ensure();
-      if (fileSfx[name]) {
-        var el = fileEls[name];
-        if (!el) {
-          try {
-            el = new Audio(fileSfx[name]);
-            el.preload = 'auto';
-            fileEls[name] = el;
-          } catch (e) { return; }
-        }
-        try {
-          el.volume = volume;
-          el.currentTime = 0;
-          var pr = el.play();
-          if (pr && pr.catch) pr.catch(function () {});
-        } catch (e) {}
-        return;
-      }
-      var s = sfx[name];
-      if (s) s();
+  function play(name) {
+    if (!ensure()) return;
+    var fn = SFX[name];
+    if (fn) fn(ctx.currentTime + 0.01);
+  }
+
+  var R3 = 1.189207115, R5 = 1.498307077, R2 = 2;
+
+  function addTone(d, sr, start, dur, freq, type, vol) {
+    var n = Math.floor(start * sr), m = Math.max(1, Math.floor(dur * sr));
+    for (var i = 0; i < m; i++) {
+      if (n + i >= d.length) break;
+      var t = i / sr;
+      var env = Math.pow(1 - t / dur, 2) * vol;
+      var ph = t * freq;
+      var v;
+      if (type === 'sine') v = Math.sin(2 * Math.PI * ph);
+      else if (type === 'square') v = ph % 1 < 0.5 ? 1 : -1;
+      else v = 2 * (ph % 1) - 1;
+      d[n + i] += env * v;
     }
+  }
+
+  function addKick(d, sr, start, dur, vol) {
+    var n = Math.floor(start * sr), m = Math.max(1, Math.floor(dur * sr));
+    for (var i = 0; i < m; i++) {
+      if (n + i >= d.length) break;
+      var t = i / sr;
+      var f = 120 - (t / dur) * 80;
+      var env = (1 - t / dur) * vol;
+      d[n + i] += Math.sin(2 * Math.PI * f * t) * env;
+    }
+  }
+
+  function addHihat(d, sr, start, dur, vol) {
+    var n = Math.floor(start * sr), m = Math.max(1, Math.floor(dur * sr));
+    for (var i = 0; i < m; i++) {
+      if (n + i >= d.length) break;
+      var t = i / sr;
+      var env = (1 - t / dur) * vol;
+      d[n + i] += (Math.random() * 2 - 1) * env;
+    }
+  }
+
+  function buildBGM() {
+    var bpm = 132, spb = 60 / bpm, sr = ctx.sampleRate;
+    var bars = 8, total = bars * 4 * spb;
+    var len = Math.floor(sr * total);
+    var buf = ctx.createBuffer(1, len, sr);
+    var d = buf.getChannelData(0);
+    var prog = [220.0, 174.61, 196.0, 164.81];
+    var seq = [1, R3, R5, R2, R5, R3, R5, R2, R5, R3, 1, R3, R5, R2, R5, R3];
+    var stepDur = spb / 4;
+    for (var bar = 0; bar < bars; bar++) {
+      var root = prog[bar % 4];
+      var barT = bar * 4 * spb;
+      for (var b = 0; b < 4; b++) {
+        var bt = barT + b * spb;
+        addTone(d, sr, bt, spb * 0.22, root / 2, 'square', 0.16);
+        addKick(d, sr, bt, 0.10, 0.40);
+        addHihat(d, sr, bt + spb / 2, 0.03, 0.03);
+      }
+      for (var s = 0; s < 16; s++) {
+        addTone(d, sr, barT + s * stepDur, stepDur * 0.9, root * seq[s], 'saw', 0.045);
+      }
+    }
+    var peak = 0;
+    for (var i = 0; i < len; i++) { var a = Math.abs(d[i]); if (a > peak) peak = a; }
+    if (peak > 0) {
+      var k = 0.9 / peak;
+      for (var i = 0; i < len; i++) d[i] *= k;
+    }
+    return buf;
+  }
+
+  function startBGM() {
+    if (!ensure() || bgm) return;
+    try {
+      var buf = buildBGM();
+      bgm = ctx.createBufferSource();
+      bgm.buffer = buf;
+      bgm.loop = true;
+      bgm.connect(musicGain);
+      bgm.start();
+    } catch (e) {}
+  }
+
+  function setMusic(on) {
+    bgmOn = on;
+    if (musicGain) musicGain.gain.value = on ? 0.3 : 0;
+  }
+
+  function setVolume(v) {
+    if (master) master.gain.value = v;
+  }
+
+  TZ.Audio = {
+    play: play,
+    startBGM: startBGM,
+    setMusic: setMusic,
+    setVolume: setVolume,
+    ensure: ensure,
+    get ready() { return !!ctx; }
   };
 })();

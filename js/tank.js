@@ -12,7 +12,7 @@ Tank.prototype.box = function () {
 Tank.prototype.canMoveTo = function (g, x, y) {
   var C = TZ.Config;
   var hw = this.w / 2, hh = this.h / 2;
-  var cs = [[x - hw + 1, y - hh + 1], [x + hw - 1, y - hh + 1], [x - hw + 1, y + hh - 1], [x + hw - 1, y + hh - 1]];
+  var cs = [[x - hw + 0.6, y - hh + 0.6], [x + hw - 0.6, y - hh + 0.6], [x - hw + 0.6, y + hh - 0.6], [x + hw - 0.6, y + hh - 0.6]];
   for (var i = 0; i < 4; i++) {
     var c = Math.floor(cs[i][0] / C.TILE), r = Math.floor(cs[i][1] / C.TILE);
     if (TZ.Map.solidAt(g, c, r)) return false;
@@ -22,15 +22,44 @@ Tank.prototype.canMoveTo = function (g, x, y) {
   return x2 - x1 >= this.w && y2 - y1 >= this.h;
 };
 
+Tank.prototype.canMoveX = function (g, dx) {
+  var C = TZ.Config;
+  var hw = this.w / 2, hh = this.h / 2;
+  var nx = this.x + dx;
+  var top = this.y - hh + 0.6, bot = this.y + hh - 0.6;
+  var xp = dx > 0 ? nx + hw - 0.6 : nx - hw + 0.6;
+  var c = Math.floor(xp / C.TILE);
+  var r1 = Math.floor(top / C.TILE), r2 = Math.floor(bot / C.TILE);
+  for (var r = r1; r <= r2; r++) if (TZ.Map.solidAt(g, c, r)) return false;
+  var x1 = TZ.u.clamp(nx - hw, 0, C.W), x2 = TZ.u.clamp(nx + hw, 0, C.W);
+  return x2 - x1 >= this.w;
+};
+
+Tank.prototype.canMoveY = function (g, dy) {
+  var C = TZ.Config;
+  var hw = this.w / 2, hh = this.h / 2;
+  var ny = this.y + dy;
+  var left = this.x - hw + 0.6, right = this.x + hw - 0.6;
+  var yp = dy > 0 ? ny + hh - 0.6 : ny - hh + 0.6;
+  var r = Math.floor(yp / C.TILE);
+  var c1 = Math.floor(left / C.TILE), c2 = Math.floor(right / C.TILE);
+  for (var c = c1; c <= c2; c++) if (TZ.Map.solidAt(g, c, r)) return false;
+  var y1 = TZ.u.clamp(ny - hh, 0, C.H), y2 = TZ.u.clamp(ny + hh, 0, C.H);
+  return y2 - y1 >= this.h;
+};
+
 Tank.prototype.slideMove = function (g, vx, vy) {
-  if (this.canMoveTo(g, this.x + vx, this.y)) this.x += vx;
-  if (this.canMoveTo(g, this.x, this.y + vy)) this.y += vy;
+  var m = Math.max(Math.abs(vx), Math.abs(vy));
+  var steps = m > 6 ? Math.ceil(m / 6) : 1;
+  var sx = vx / steps, sy = vy / steps;
+  for (var i = 0; i < steps; i++) {
+    if (sx !== 0 && this.canMoveX(g, sx)) this.x += sx;
+    if (sy !== 0 && this.canMoveY(g, sy)) this.y += sy;
+  }
 };
 
 TZ.Player = Player;
 TZ.Enemy = Enemy;
-
-var DIRS4 = [{ x:0, y:-1 }, { x:0, y:1 }, { x:-1, y:0 }, { x:1, y:0 }];
 
 function drawGeomTank(ctx, color) {
   ctx.fillStyle = 'rgba(0,0,0,.35)';
@@ -55,10 +84,12 @@ function Player(key) {
   this.name = d.name;
   this.color = d.color;
   this.img = TZ.Images[key];
-  this.maxHp = d.hp; this.hp = d.hp;
-  this.speed = d.speed;
-  this.attack = d.attack;
-  this.fireRate = d.fireRate;
+  var m = TZ.Level.mults();
+  this.baseMaxHp = d.hp; this.baseSpeed = d.speed; this.baseAttack = d.attack; this.baseFireRate = d.fireRate;
+  this.maxHp = Math.round(d.hp * m.hp); this.hp = this.maxHp;
+  this.speed = Math.round(d.speed * m.spd);
+  this.attack = Math.round(d.attack * m.atk);
+  this.fireRate = d.fireRate * m.rate;
   this.bulletSpeed = d.bulletSpeed;
   this.armor = d.armor;
   this.fireLevel = 1;
@@ -162,13 +193,14 @@ Player.prototype.useSkill = function (app) {
     }
     case 'dash':
       this.dash.t = 0.16;
+      TZ.Audio.play('dash');
       break;
     case 'shield':
       this.shield = Math.max(this.shield, 80);
       this.shieldTimer = 10;
       break;
   }
-  TZ.Audio.play(s.key);
+  TZ.Audio.play('skill');
 };
 
 Player.prototype.takeDamage = function (dmg) {
@@ -185,6 +217,7 @@ Player.prototype.takeDamage = function (dmg) {
   TZ.Particles.spawnHit(this.x, this.y, '#ff2e4d');
   TZ.Particles.spawnText(this.x, this.y - 26, '-' + Math.round(d), '#ff5a5a');
   TZ.Particles.addShake(5);
+  TZ.Audio.play('hit');
   if (this.hp <= 0) {
     this.hp = 0;
     this.alive = false;
@@ -241,35 +274,51 @@ function Enemy(key, x, y, app) {
   this.kind = key;
   this.color = d.color;
   this.radius = r;
-  this.hp = d.hp; this.maxHp = d.hp;
-  this.speed = d.speed;
-  this.attack = d.attack;
+  var eb = TZ.Level.enemyBoost();
+  this.hp = Math.round(d.hp * (1 + eb)); this.maxHp = this.hp;
+  var psp = app.player ? app.player.speed : 180;
+  this.speed = Math.min(Math.round(d.speed * (1 + eb)), Math.round(psp * 0.65));
+  this.attack = Math.round(d.attack * (1 + eb));
   this.bulletSpeed = d.bulletSpeed;
   this.shoot = d.shoot;
   this.scoreVal = d.score;
+  this.goldVal = d.gold || Math.max(5, Math.round(d.score / 15));
   this.armor = d.armor || 0;
   this.img = d.img ? TZ.Images['E_' + key] : null;
   this.invincible = 1.1;
   this.shootCd = TZ.u.rand(0.8, 2);
-  this.moveDir = null;
-  this.decideT = 0;
-  this.stuckT = 0.3;
+  this.strafe = null;
+  this.strafeT = 0;
+  this.wp = null;
+  this.wpT = 0;
+  this.randFireT = TZ.u.rand(1.5, 3);
   this.targetBase = app.mode === 'adventure' && app.baseDef &&
     (key === 'grunt' || key === 'heavy' || key === 'kamikaze') && Math.random() < 0.25;
 }
 Enemy.prototype = Object.create(Tank.prototype);
 
-Enemy.prototype.chooseDir = function (g, vec) {
-  var best = null, bestScore = -2;
-  for (var i = 0; i < DIRS4.length; i++) {
-    var d = DIRS4[i];
-    var score = d.x * vec.x + d.y * vec.y;
-    if (score > bestScore && this.canMoveTo(g, this.x + d.x * this.speed * 0.15, this.y + d.y * this.speed * 0.15)) {
-      bestScore = score;
-      best = d;
+Enemy.prototype.pickWaypoint = function (app) {
+  var C = TZ.Config;
+  for (var i = 0; i < 20; i++) {
+    var c = 1 + Math.floor(Math.random() * 18);
+    var r = 2 + Math.floor(Math.random() * 17);
+    if (app.map.grid[r][c] === 0) return { x:(c + 0.5) * C.TILE, y:(r + 0.5) * C.TILE };
+  }
+  return { x:C.TILE * 9.5, y:C.TILE * 10 };
+};
+
+Enemy.prototype.steer = function (g, mv) {
+  var base = Math.atan2(mv.y, mv.x);
+  var probe = this.speed * 0.35;
+  for (var sp = 0; sp <= 5; sp++) {
+    var off = sp * 0.45;
+    for (var s = -1; s <= 1; s += 2) {
+      var a = base + s * off;
+      var v = { x: Math.cos(a), y: Math.sin(a) };
+      if (this.canMoveTo(g, this.x + v.x * probe, this.y + v.y * probe)) return v;
     }
   }
-  return best;
+  return null;
 };
 
 Enemy.prototype.update = function (dt, app) {
@@ -298,49 +347,63 @@ Enemy.prototype.update = function (dt, app) {
     vec = { x:dx / dist, y:dy / dist };
   }
 
-  var blocked = this.moveDir && !this.canMoveTo(app.map.grid,
-    this.x + this.moveDir.x * this.speed * 0.1,
-    this.y + this.moveDir.y * this.speed * 0.1);
-  if (blocked) this.decideT = 0;
-  this.decideT -= dt;
-  if (this.decideT <= 0) {
-    var d = null;
-    if (vec) d = this.chooseDir(app.map.grid, vec);
-    if (!d) {
-      for (var i = 0; i < DIRS4.length; i++) {
-        var q = DIRS4[i];
-        if (this.canMoveTo(app.map.grid, this.x + q.x * this.speed * 0.15, this.y + q.y * this.speed * 0.15)) { d = q; break; }
+  var D = 6 * TZ.Config.TILE;
+  var det = Math.abs(tx - this.x) < D && Math.abs(ty - this.y) < D;
+
+  var mv = null;
+  if (det) {
+    mv = vec;
+    if (this.kind === 'elite') {
+      if (this.strafeT > 0) {
+        this.strafeT -= dt;
+        if (this.strafeT <= 0) this.strafe = null;
+        else if (this.strafe) mv = this.strafe;
+      } else if (vec && Math.random() < dt * 0.8) {
+        var px = -vec.y, py = vec.x;
+        if (Math.random() < 0.5) { px = -px; py = -py; }
+        this.strafe = { x:px, y:py };
+        this.strafeT = TZ.u.rand(0.15, 0.35);
       }
     }
-    if (d) this.moveDir = d;
-    if (this.kind === 'elite' && Math.random() < 0.12) this.moveDir = TZ.u.choice(DIRS4);
-    this.decideT = TZ.u.rand(0.12, 0.28);
-  }
-  if (this.moveDir) {
-    var px = this.x, py = this.y;
-    this.dir = this.moveDir;
-    this.slideMove(app.map.grid, this.moveDir.x * this.speed * dt, this.moveDir.y * this.speed * dt);
-    if (this.x === px && this.y === py) {
-      this.stuckT -= dt;
-      if (this.stuckT <= 0) { this.decideT = 0; this.stuckT = 0.3; }
-    } else {
-      this.stuckT = 0.3;
+  } else {
+    this.wpT -= dt;
+    if (!this.wp || this.wpT <= 0 || Math.hypot(this.wp.x - this.x, this.wp.y - this.y) < 24) {
+      this.wp = this.pickWaypoint(app);
+      this.wpT = 4;
+    }
+    if (this.wp) {
+      var wx = this.wp.x - this.x, wy = this.wp.y - this.y;
+      var wl = Math.hypot(wx, wy) || 1;
+      mv = { x:wx / wl, y:wy / wl };
     }
   }
+  if (mv) {
+    var st = this.steer(app.map.grid, mv);
+    if (st) mv = st;
+    var ml = Math.hypot(mv.x, mv.y);
+    if (ml > 0) mv = { x:mv.x / ml, y:mv.y / ml };
+    this.dir = mv;
+    var px = this.x, py = this.y;
+    this.slideMove(app.map.grid, mv.x * this.speed * dt, mv.y * this.speed * dt);
+    if (!det && this.x === px && this.y === py) this.wpT = 0;
+  }
 
+  this.randFireT -= dt;
   this.shootCd -= dt;
-  if (this.shoot && this.shootCd <= 0 && dist < 560) {
-    if (this.kind === 'sniper') this.shootCd = 1.7;
-    else if (this.kind === 'heavy') this.shootCd = TZ.u.rand(1.5, 2.1);
-    else this.shootCd = TZ.u.rand(0.9, 1.5);
-    var a = Math.atan2(dy, dx);
+  if (this.shoot && this.shootCd <= 0 && (det || this.randFireT <= 0)) {
+    var fa = det ? Math.atan2(dy, dx) : Math.atan2(this.dir.y, this.dir.x);
+    fa += TZ.u.rand(-0.08, 0.08);
     app.bullets.push(new TZ.Bullet({
       x:this.x, y:this.y,
-      vx:Math.cos(a) * this.bulletSpeed, vy:Math.sin(a) * this.bulletSpeed,
+      vx:Math.cos(fa) * this.bulletSpeed, vy:Math.sin(fa) * this.bulletSpeed,
       damage:this.attack, owner:'enemy', color:this.color, size:7,
       splash:this.kind === 'enemyBlast' ? 46 : 0
     }));
     TZ.Audio.play('fire');
+    if (this.kind === 'sniper') this.shootCd = 1.7;
+    else if (this.kind === 'heavy') this.shootCd = TZ.u.rand(1.5, 2.1);
+    else this.shootCd = TZ.u.rand(0.9, 1.5);
+    this.randFireT = TZ.u.rand(1.2, 2.8);
   }
 
   if (dist < this.radius + p.w * 0.5) {
@@ -370,6 +433,7 @@ Enemy.prototype.takeDamage = function (dmg, app) {
   this.hp -= d;
   TZ.Particles.spawnHit(this.x, this.y, this.color);
   TZ.Particles.spawnText(this.x, this.y - this.radius - 6, '-' + Math.round(d), '#ffffff');
+  TZ.Audio.play('enemyHit');
   if (this.hp <= 0) this.die(app, false);
 };
 
@@ -381,6 +445,11 @@ Enemy.prototype.die = function (app, silent) {
   if (app.player) {
     app.player.addScore(this.scoreVal);
     app.player.kills++;
+  }
+  if (this.goldVal) {
+    app.goldEarned = (app.goldEarned || 0) + this.goldVal;
+    TZ.Level.addGold(this.goldVal);
+    TZ.Particles.spawnText(this.x, this.y - this.radius - 18, '+' + this.goldVal + ' G', '#ffd23f');
   }
   if (!silent && app.player && app.player.alive && Math.random() < 0.2) this.dropItem(app);
 };

@@ -90,6 +90,9 @@ body {
 #shield-bar { background:linear-gradient(90deg,rgba(0,240,255,.3),#00f0ff); }
 
 #score { font-size:30px; font-weight:900; color:#eaffff; text-shadow:0 0 14px rgba(0,240,255,.7); }
+.hud-meta { display:flex; gap:12px; justify-content:flex-end; color:#ffd23f; font-size:13px; font-weight:700; margin-top:2px; }
+#hud-level { color:#00ffb0; }
+#hud-gold { color:#ffd23f; }
 .label { font-size:11px; letter-spacing:.35em; color:#7aa7c4; }
 #combo { font-size:20px; font-weight:900; color:#ffd23f; text-shadow:0 0 12px #ffd23f; }
 #combo.active { animation:pulse .5s infinite; }
@@ -290,6 +293,8 @@ body {
   border-bottom:1px solid rgba(0,240,255,.1);
   color:#cfe8ff; font-size:15px; gap:24px;
 }
+.up-hint { color:#7aa7c4; font-size:12px; max-width:240px; text-align:right; line-height:1.5; }
+#upgrade-do:disabled { opacity:.4; cursor:not-allowed; }
 input[type=range] { width:220px; accent-color:#00f0ff; }
 
 #banner {

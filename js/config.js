@@ -17,16 +17,16 @@ window.TZ = window.TZ || {};
   };
 
   var ENEMIES = {
-    scout:    { key:'scout',    name:'侦察兵', hp:30,  speed:220, attack:10, bulletSpeed:0,   shoot:false, color:'#8ffcff', score:100,  radius:16 },
-    grunt:    { key:'grunt',    name:'突击兵', hp:60,  speed:120, attack:20, bulletSpeed:400, shoot:true,  color:'#ff9f43', score:200,  radius:17 },
-    heavy:    { key:'heavy',    name:'重装兵', hp:200, speed:70,  attack:35, bulletSpeed:320, shoot:true,  color:'#c0392b', score:400,  radius:20 },
-    kamikaze: { key:'kamikaze', name:'自爆兵', hp:40,  speed:170, attack:60, bulletSpeed:0,   shoot:false, color:'#ff4757', score:150,  radius:16 },
-    sniper:   { key:'sniper',   name:'狙击手', hp:50,  speed:90,  attack:40, bulletSpeed:800, shoot:true,  color:'#a29bfe', score:300,  radius:16 },
-    elite:    { key:'elite',    name:'精英兵', hp:120, speed:150, attack:25, bulletSpeed:450, shoot:true,  color:'#fdcb6e', score:500,  radius:18 },
-    defaultEnemy: { key:'defaultEnemy', name:'默认敌方坦克', type:'平衡型', hp:100, speed:160, attack:25, bulletSpeed:450, shoot:true, color:'#9ad0ff', score:250, radius:18, img:'assets/tanks/enemy_default.png' },
-    enemyBlast:     { key:'enemyBlast',     name:'爆破-坦克', type:'攻击型', hp:90,  speed:140, attack:45, bulletSpeed:420, shoot:true, color:'#ff5a2e', score:400, radius:18, img:'assets/tanks/enemy_blast.png' },
-    enemyLightning: { key:'enemyLightning', name:'闪电-坦克', type:'速度型', hp:60,  speed:260, attack:18, bulletSpeed:520, shoot:true, color:'#ffd23f', score:300, radius:16, img:'assets/tanks/enemy_lightning.png' },
-    enemyGuard:     { key:'enemyGuard',     name:'守护-坦克', type:'防御型', hp:220, speed:130, attack:22, bulletSpeed:460, shoot:true, color:'#00ffb0', score:500, radius:20, armor:3, img:'assets/tanks/enemy_guard.png' }
+    scout:    { key:'scout',    name:'侦察兵', hp:30,  speed:220, attack:10, bulletSpeed:0,   shoot:false, color:'#8ffcff', score:100,  radius:16, gold:8 },
+    grunt:    { key:'grunt',    name:'突击兵', hp:60,  speed:120, attack:20, bulletSpeed:400, shoot:true,  color:'#ff9f43', score:200,  radius:17, gold:12 },
+    heavy:    { key:'heavy',    name:'重装兵', hp:200, speed:70,  attack:35, bulletSpeed:320, shoot:true,  color:'#c0392b', score:400,  radius:20, gold:30 },
+    kamikaze: { key:'kamikaze', name:'自爆兵', hp:40,  speed:170, attack:60, bulletSpeed:0,   shoot:false, color:'#ff4757', score:150,  radius:16, gold:10 },
+    sniper:   { key:'sniper',   name:'狙击手', hp:50,  speed:90,  attack:40, bulletSpeed:800, shoot:true,  color:'#a29bfe', score:300,  radius:16, gold:20 },
+    elite:    { key:'elite',    name:'精英兵', hp:120, speed:150, attack:25, bulletSpeed:450, shoot:true,  color:'#fdcb6e', score:500,  radius:18, gold:25 },
+    defaultEnemy: { key:'defaultEnemy', name:'默认敌方坦克', type:'平衡型', hp:100, speed:160, attack:25, bulletSpeed:450, shoot:true, color:'#9ad0ff', score:250, radius:18, gold:15, img:'assets/tanks/enemy_default.png' },
+    enemyBlast:     { key:'enemyBlast',     name:'爆破-坦克', type:'攻击型', hp:90,  speed:140, attack:45, bulletSpeed:420, shoot:true, color:'#ff5a2e', score:400, radius:18, gold:25, img:'assets/tanks/enemy_blast.png' },
+    enemyLightning: { key:'enemyLightning', name:'闪电-坦克', type:'速度型', hp:60,  speed:260, attack:18, bulletSpeed:520, shoot:true, color:'#ffd23f', score:300, radius:16, gold:18, img:'assets/tanks/enemy_lightning.png' },
+    enemyGuard:     { key:'enemyGuard',     name:'守护-坦克', type:'防御型', hp:220, speed:130, attack:22, bulletSpeed:460, shoot:true, color:'#00ffb0', score:500, radius:20, armor:3, gold:30, img:'assets/tanks/enemy_guard.png' }
   };
 
   var BOSSES = {

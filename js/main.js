@@ -3,7 +3,9 @@ TZ.Save = (function () {
     unlocked: { blast:false, lightning:false, guard:false },
     progress: { chapter:0, level:0 },
     scores: [],
-    settings: { volume:0.5, baseDef:true }
+    settings: { baseDef:true, music:true },
+    level: 1,
+    gold: 0
   };
   var data = JSON.parse(JSON.stringify(defaults));
 
@@ -76,6 +78,41 @@ TZ.Save = (function () {
   };
 })();
 
+TZ.Level = {
+  MAX: 100,
+  get: function () { return TZ.Save.data.level || 1; },
+  gold: function () { return TZ.Save.data.gold || 0; },
+  cost: function (n) { return Math.floor(20 * Math.pow(1.04, (n || 1) - 1)); },
+  mults: function () {
+    var lv = this.get();
+    var b = (lv - 1) * 0.01;
+    return {
+      hp: 1 + b,
+      atk: 1 + b,
+      spd: 1 + (lv - 1) * 0.005,
+      rate: 1 + (lv - 1) * 0.005
+    };
+  },
+  enemyBoost: function () {
+    return (this.get() - 1) * 0.01 * 0.3;
+  },
+  canUpgrade: function () {
+    return this.get() < this.MAX && this.gold() >= this.cost(this.get());
+  },
+  upgrade: function () {
+    if (!this.canUpgrade()) return false;
+    var lv = this.get();
+    TZ.Save.data.gold = this.gold() - this.cost(lv);
+    TZ.Save.data.level = Math.min(this.MAX, lv + 1);
+    TZ.Save.save();
+    return true;
+  },
+  addGold: function (n) {
+    TZ.Save.data.gold = this.gold() + n;
+    TZ.Save.save();
+  }
+};
+
 TZ.Game = (function () {
   var app = null;
   var canvas, ctx;
@@ -111,7 +148,6 @@ TZ.Game = (function () {
     ctx = canvas.getContext('2d');
 
     TZ.Save.load();
-    TZ.Audio.setVolume(TZ.Save.data.settings.volume);
     TZ.UI.init();
 
     document.getElementById('pause-btn').addEventListener('click', function () {
@@ -168,8 +204,6 @@ TZ.Game = (function () {
   }
 
   function start(mode, tankKey) {
-    var settings = TZ.Save.data.settings;
-    TZ.Audio.ensure();
     app = {
       scene: 'playing',
       mode: mode,
@@ -182,8 +216,9 @@ TZ.Game = (function () {
       enemies: [], bullets: [], items: [], meteors: [],
       map: null, base: null, boss: null,
       score: 0, freeze: 0, time: 0,
+      goldEarned: 0,
       paused: false,
-      baseDef: settings.baseDef,
+      baseDef: TZ.Save.data.settings.baseDef,
       gameComplete: false,
       replayAt: null
     };
@@ -196,32 +231,30 @@ TZ.Game = (function () {
       app.chapter = pr.chapter;
       app.level = pr.level;
       pendingStart = null;
-      app.map = { grid: TZ.Map.create(app.chapter) };
+      app.map = { grid: TZ.Map.create(app.chapter * TZ.Config.LEVELS_PER_CHAPTER + app.level + 1) };
       app.base = { x:TZ.Map.BASE.x, y:TZ.Map.BASE.y, hp:app.baseDef ? 200 : 999999, maxHp:200, alive:true };
       buildLevel(app);
       TZ.UI.setBanner('第' + (app.chapter * TZ.Config.LEVELS_PER_CHAPTER + app.level + 1) + '关', 1600);
     } else if (mode === 'endless') {
       app.chapter = 0;
-      app.map = { grid: TZ.Map.create(0) };
+      app.map = { grid: TZ.Map.create((Math.random() * 0x7fffffff) | 0) };
       app.base = { x:TZ.Map.BASE.x, y:TZ.Map.BASE.y, hp:999999, maxHp:200, alive:true };
       startWave(app);
     } else {
       app.chapter = 0;
-      app.map = { grid: TZ.Map.create(0) };
+      app.map = { grid: TZ.Map.create((Math.random() * 0x7fffffff) | 0) };
       app.base = { x:TZ.Map.BASE.x, y:TZ.Map.BASE.y, hp:999999, maxHp:200, alive:true };
       app.bossKey = TZ.UI.selectedBoss;
       app.boss = new TZ.Boss(app.bossKey);
       app.bossSpawned = true;
       TZ.UI.setBanner('BOSS 来袭', 2000);
-      TZ.Audio.play('boss');
-    }
+      }
 
     app.player = new TZ.Player(tankKey);
     document.getElementById('hud-avatar').src = TZ.Config.TANKS[tankKey].img;
     TZ.UI.hideAll();
     TZ.UI.showHud(true);
-    TZ.Audio.play('wave');
-  }
+    }
 
   function buildLevel(app) {
     var isBoss = app.level === 4;
@@ -319,6 +352,21 @@ TZ.Game = (function () {
       b.update(dt, app);
       if (b.dead) app.bullets.splice(i, 1);
     }
+    for (var i = app.bullets.length - 1; i >= 0; i--) {
+      var pb = app.bullets[i];
+      if (pb.owner !== 'player' || pb.dead) continue;
+      for (var j = app.bullets.length - 1; j >= 0; j--) {
+        if (i === j) continue;
+        var eb = app.bullets[j];
+        if (eb.owner === 'player' || eb.dead) continue;
+        if (TZ.u.dist(pb.x, pb.y, eb.x, eb.y) < pb.size + eb.size) {
+          pb.dead = true;
+          eb.dead = true;
+          TZ.Particles.spawnHit((pb.x + eb.x) / 2, (pb.y + eb.y) / 2, '#ffd23f');
+          break;
+        }
+      }
+    }
 
     for (var i = app.items.length - 1; i >= 0; i--) {
       if (app.items[i].update(dt, app)) app.items.splice(i, 1);
@@ -329,7 +377,6 @@ TZ.Game = (function () {
       m.t -= dt;
       if (m.t <= 0) {
         TZ.Particles.spawnExplosion(m.x, m.y, '#ff2e4d', 30, 3);
-        TZ.Audio.play('boom');
         var p = app.player;
         if (p && p.alive && TZ.u.dist(m.x, m.y, p.x, p.y) < m.r) p.takeDamage(30);
         TZ.Particles.addShake(8);
@@ -393,7 +440,6 @@ TZ.Game = (function () {
       app.bossSpawned = true;
       app.boss = new TZ.Boss(app.bossKey);
       TZ.UI.setBanner('BOSS 来袭', 2000);
-      TZ.Audio.play('boss');
       return;
     }
     if (app.boss && app.boss.alive) return;
@@ -404,7 +450,6 @@ TZ.Game = (function () {
   function victory() {
     if (!app || app.scene !== 'playing') return;
     app.scene = 'victory';
-    TZ.Audio.play('victory');
     TZ.Particles.addShake(6);
 
     if (app.mode === 'adventure') {
@@ -430,7 +475,6 @@ TZ.Game = (function () {
     if (!app || app.scene !== 'playing') return;
     app.scene = 'defeat';
     app.deathReason = reason;
-    TZ.Audio.play('defeat');
     TZ.Save.addScore({ score:app.score, mode:app.mode, tank:TZ.Config.TANKS[app.tankKey].name, date:Date.now() });
     TZ.UI.showResult(false, app);
   }

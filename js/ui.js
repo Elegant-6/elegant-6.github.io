@@ -18,25 +18,28 @@ TZ.UI = (function () {
     var btns = document.querySelectorAll('[data-action]');
     for (var i = 0; i < btns.length; i++) {
       btns[i].addEventListener('click', function () {
-        TZ.Audio.play('click');
+                TZ.Audio.play('click');
         handle(this.getAttribute('data-action'));
       });
     }
 
-    $('set-volume').addEventListener('input', function () {
-      var v = this.value / 100;
-      TZ.Audio.setVolume(v);
-      TZ.Save.data.settings.volume = v;
-      TZ.Save.save();
-    });
     $('set-base').addEventListener('click', function () {
+      TZ.Audio.play('click');
       TZ.Save.data.settings.baseDef = !TZ.Save.data.settings.baseDef;
       TZ.Save.save();
       refreshSettings();
+          });
+
+    $('set-music').addEventListener('click', function () {
       TZ.Audio.play('click');
-    });
+      TZ.Save.data.settings.music = !(TZ.Save.data.settings.music !== false);
+      TZ.Save.save();
+      TZ.Audio.setMusic(TZ.Save.data.settings.music !== false);
+      refreshSettings();
+          });
 
     refreshSettings();
+    TZ.Audio.setMusic(TZ.Save.data.settings.music !== false);
     buildTankCards();
     buildBossCards();
     show('screen-menu');
@@ -76,6 +79,19 @@ TZ.UI = (function () {
       case 'leaderboard':
         renderLeaderboard();
         show('screen-leaderboard');
+        break;
+      case 'upgrade':
+        refreshUpgrade();
+        show('screen-upgrade');
+        break;
+      case 'upgrade-do':
+        if (TZ.Level.upgrade()) {
+          TZ.Audio.play('item');
+          setBanner('升级成功 · Lv ' + TZ.Level.get(), 1200);
+          refreshUpgrade();
+        } else {
+          setBanner('金币不足或已达满级', 1200);
+        }
         break;
       case 'settings':
         refreshSettings();
@@ -148,7 +164,7 @@ TZ.UI = (function () {
           '<div class="tank-type">' + d.type + '</div>' +
           (unlocked ? '' : '<div class="lock-tag">' + unlockHint(k) + '</div>');
         el.addEventListener('click', function () {
-          if (!unlocked) { TZ.Audio.play('defeat'); return; }
+          if (!unlocked) { return; }
           selectedTank = k;
           buildTankCards();
         });
@@ -202,7 +218,7 @@ TZ.UI = (function () {
           '<div class="boss-skills">' + skills + '</div>' +
           (unlocked ? '' : '<div class="lock-tag">' + (idx === 1 ? '通关第1章解锁' : (idx === 2 ? '通关第2章解锁' : '通关第3章解锁')) + '</div>');
         el.addEventListener('click', function () {
-          if (!unlocked) { TZ.Audio.play('defeat'); return; }
+          if (!unlocked) { return; }
           selectedBoss = k;
           buildBossCards();
         });
@@ -234,17 +250,35 @@ TZ.UI = (function () {
 
   function refreshSettings() {
     var s = TZ.Save.data.settings;
-    $('set-volume').value = Math.round(s.volume * 100);
     var b = $('set-base');
     b.textContent = s.baseDef ? '开启' : '关闭';
     b.classList.toggle('on', !!s.baseDef);
+    var m = $('set-music');
+    var on = s.music !== false;
+    m.textContent = on ? '开启' : '关闭';
+    m.classList.toggle('on', on);
+  }
+
+  function refreshUpgrade() {
+    var lv = TZ.Level.get();
+    var bonus = Math.round((lv - 1) * 100);
+    $('up-level').textContent = 'Lv ' + lv;
+    $('up-gold').textContent = TZ.Level.gold();
+    $('up-bonus').textContent = '+' + bonus + '%';
+    if (lv >= TZ.Level.MAX) {
+      $('up-cost').textContent = '已满级';
+      $('upgrade-do').disabled = true;
+    } else {
+      $('up-cost').textContent = TZ.Level.cost(lv);
+      $('upgrade-do').disabled = !TZ.Level.canUpgrade();
+    }
   }
 
   function bind(el) {
     var btns = el.querySelectorAll('[data-action]');
     for (var i = 0; i < btns.length; i++) {
       btns[i].addEventListener('click', function () {
-        TZ.Audio.play('click');
+                TZ.Audio.play('click');
         handle(this.getAttribute('data-action'));
       });
     }
@@ -264,6 +298,8 @@ TZ.UI = (function () {
     $('shield-bar').style.opacity = p.shield > 0 ? 1 : 0.25;
 
     $('score').textContent = app.score;
+    $('hud-level').textContent = 'Lv ' + TZ.Level.get();
+    $('hud-gold').textContent = '金币 ' + TZ.Level.gold();
     var comboEl = $('combo');
     if (p.combo >= 2) {
       comboEl.textContent = 'COMBO ×' + p.combo;
@@ -352,6 +388,7 @@ TZ.UI = (function () {
   }
 
   function showResult(win, app) {
+    TZ.Audio.play(win ? 'victory' : 'defeat');
     var title = $('result-title');
     title.textContent = win ? (app.mode === 'adventure' ? '关卡通关' : '挑战成功') : '任务失败';
     title.className = win ? 'win' : 'lose';
@@ -368,6 +405,7 @@ TZ.UI = (function () {
     $('result-stats').innerHTML =
       '<span>得分 ' + app.score + '</span>' +
       '<span>击杀 ' + app.player.kills + '</span>' +
+      '<span>金币 +' + (app.goldEarned || 0) + '</span>' +
       '<span>最高连击 ×' + app.player.maxCombo + '</span>';
 
     var btns = $('result-btns');

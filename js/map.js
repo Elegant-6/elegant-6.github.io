@@ -18,45 +18,107 @@ TZ.Map = (function () {
     set(g, 9, 17, 0);
   }
 
-  function patternA(g) {
-    [[3,2],[6,2],[13,2],[16,2],[2,6],[4,6],[15,6],[17,6],[3,10],[6,10],[13,10],[16,10],[2,14],[4,14],[15,14],[17,14]]
-      .forEach(function (p) { set(g, p[0], p[1], 1); });
-    set(g, 9, 4, 1); set(g, 10, 4, 1); set(g, 9, 15, 1); set(g, 10, 15, 1);
-    set(g, 5, 7, 1); set(g, 5, 8, 1); set(g, 14, 7, 1); set(g, 14, 8, 1);
-    set(g, 3, 12, 1); set(g, 4, 12, 1); set(g, 5, 12, 1);
-    set(g, 14, 12, 1); set(g, 15, 12, 1); set(g, 16, 12, 1);
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
   }
 
-  function patternB(g) {
-    patternA(g);
-    set(g, 4, 4, 2); set(g, 15, 4, 2); set(g, 4, 15, 2); set(g, 15, 15, 2);
-    set(g, 1, 5, 1); set(g, 2, 5, 1); set(g, 3, 5, 1); set(g, 1, 6, 1); set(g, 1, 7, 1); set(g, 2, 7, 1); set(g, 3, 7, 1);
-    set(g, 16, 5, 1); set(g, 17, 5, 1); set(g, 18, 5, 1); set(g, 18, 6, 1); set(g, 18, 7, 1); set(g, 17, 7, 1); set(g, 16, 7, 1);
-    set(g, 7, 8, 2); set(g, 8, 8, 2); set(g, 7, 9, 2); set(g, 8, 9, 2);
-    set(g, 11, 8, 2); set(g, 12, 8, 2); set(g, 11, 9, 2); set(g, 12, 9, 2);
+  function inZone(c, r) {
+    if (r <= 1 && (c <= 2 || (c >= 8 && c <= 11) || c >= 17)) return true;
+    if (r >= 15 && c >= 4 && c <= 15) return true;
+    return false;
   }
 
-  function patternC(g) {
-    patternB(g);
-    set(g, 2, 2, 1); set(g, 3, 2, 1); set(g, 2, 3, 1); set(g, 3, 3, 1);
-    set(g, 16, 2, 1); set(g, 17, 2, 1); set(g, 16, 3, 1); set(g, 17, 3, 1);
-    set(g, 1, 8, 1); set(g, 2, 8, 1); set(g, 1, 9, 1); set(g, 2, 9, 1);
-    set(g, 17, 8, 1); set(g, 18, 8, 1); set(g, 17, 9, 1); set(g, 18, 9, 1);
-    set(g, 6, 5, 2); set(g, 13, 5, 2); set(g, 6, 14, 2); set(g, 13, 14, 2);
-    set(g, 5, 11, 1); set(g, 6, 11, 1); set(g, 7, 11, 1);
-    set(g, 12, 11, 1); set(g, 13, 11, 1); set(g, 14, 11, 1);
-    set(g, 4, 8, 1); set(g, 4, 9, 1); set(g, 4, 10, 1);
-    set(g, 15, 8, 1); set(g, 15, 9, 1); set(g, 15, 10, 1);
-    set(g, 9, 2, 2); set(g, 10, 2, 2); set(g, 9, 3, 2); set(g, 10, 3, 2);
-    set(g, 9, 16, 2); set(g, 10, 16, 2);
+  function place2x2(g, rng, n) {
+    for (var i = 0; i < n; i++) {
+      var c = 1 + Math.floor(rng() * 17);
+      var r = 2 + Math.floor(rng() * 13);
+      if (c + 1 > 18 || r + 1 > 15) continue;
+      if (inZone(c, r) || inZone(c + 1, r) || inZone(c, r + 1) || inZone(c + 1, r + 1)) continue;
+      if (g[r][c] === 0 && g[r][c + 1] === 0 && g[r + 1][c] === 0 && g[r + 1][c + 1] === 0) {
+        set(g, c, r, 1); set(g, c + 1, r, 1); set(g, c, r + 1, 1); set(g, c + 1, r + 1, 1);
+      }
+    }
   }
 
-  function create(kind) {
+  function placeBarH(g, rng, n) {
+    for (var i = 0; i < n; i++) {
+      var r = 2 + Math.floor(rng() * 13);
+      var c = 1 + Math.floor(rng() * 14);
+      var len = 3 + Math.floor(rng() * 3);
+      var gap = Math.floor(rng() * len);
+      var ok = true;
+      for (var j = 0; j < len; j++) {
+        var cc = c + j;
+        if (cc > 18 || inZone(cc, r) || g[r][cc] !== 0) { ok = false; break; }
+      }
+      if (ok) for (var j = 0; j < len; j++) if (j !== gap) g[r][c + j] = 1;
+    }
+  }
+
+  function placeBarV(g, rng, n) {
+    for (var i = 0; i < n; i++) {
+      var c = 2 + Math.floor(rng() * 15);
+      var r = 2 + Math.floor(rng() * 12);
+      var len = 3 + Math.floor(rng() * 3);
+      var gap = Math.floor(rng() * len);
+      var ok = true;
+      for (var j = 0; j < len; j++) {
+        var rr = r + j;
+        if (rr > 15 || inZone(c, rr) || g[rr][c] !== 0) { ok = false; break; }
+      }
+      if (ok) for (var j = 0; j < len; j++) if (j !== gap) g[r + j][c] = 1;
+    }
+  }
+
+  function placeSteel(g, rng, n) {
+    for (var i = 0; i < n; i++) {
+      var c = 1 + Math.floor(rng() * 17);
+      var r = 2 + Math.floor(rng() * 13);
+      if (c + 1 > 18 || r + 1 > 15) continue;
+      if (inZone(c, r) || inZone(c + 1, r) || inZone(c, r + 1) || inZone(c + 1, r + 1)) continue;
+      if (g[r][c] === 0 && g[r][c + 1] === 0 && g[r + 1][c] === 0 && g[r + 1][c + 1] === 0) {
+        set(g, c, r, 2); set(g, c + 1, r, 2); set(g, c, r + 1, 2); set(g, c + 1, r + 1, 2);
+      }
+    }
+  }
+
+  function floodFrom(g, sc, sr) {
+    var seen = {};
+    var stack = [[sc, sr]];
+    seen[sc + ',' + sr] = 1;
+    while (stack.length) {
+      var p = stack.pop();
+      var c = p[0], r = p[1];
+      if (r - 1 >= 0 && g[r - 1][c] === 0 && !seen[c + ',' + (r - 1)]) { seen[c + ',' + (r - 1)] = 1; stack.push([c, r - 1]); }
+      if (r + 1 < C.ROWS && g[r + 1][c] === 0 && !seen[c + ',' + (r + 1)]) { seen[c + ',' + (r + 1)] = 1; stack.push([c, r + 1]); }
+      if (c - 1 >= 0 && g[r][c - 1] === 0 && !seen[(c - 1) + ',' + r]) { seen[(c - 1) + ',' + r] = 1; stack.push([c - 1, r]); }
+      if (c + 1 < C.COLS && g[r][c + 1] === 0 && !seen[(c + 1) + ',' + r]) { seen[(c + 1) + ',' + r] = 1; stack.push([c + 1, r]); }
+    }
+    return function (c, r) { return !!seen[c + ',' + r]; };
+  }
+
+  function create(seed) {
+    var rng = mulberry32(seed >>> 0 || 1);
     var g = empty();
     fort(g);
-    if (kind >= 2) patternC(g);
-    else if (kind === 1) patternB(g);
-    else patternA(g);
+    var d = 1 + (seed % 3) * 0.4;
+    placeBarH(g, rng, Math.round((2 + Math.floor(rng() * 3)) * d));
+    placeBarV(g, rng, Math.round((2 + Math.floor(rng() * 3)) * d));
+    place2x2(g, rng, Math.round((4 + Math.floor(rng() * 4)) * d));
+    placeSteel(g, rng, Math.round((1 + Math.floor(rng() * 3)) * d));
+    var spawns = [[1, 1], [9, 1], [18, 1]];
+    for (var i = 0; i < spawns.length; i++) {
+      var reach = floodFrom(g, 9, 17);
+      if (!reach(spawns[i][0], spawns[i][1])) {
+        var col = spawns[i][0];
+        for (var r = 2; r <= 16; r++) g[r][col] = 0;
+      }
+    }
     return g;
   }
 

@@ -52,9 +52,9 @@ TZ.Item.prototype.pickup = function (app) {
       }
       break;
   }
-  TZ.Audio.play('pickup');
   TZ.Particles.spawnText(this.x, this.y - 22, TZ.Config.ITEMS[this.key].name, this.color);
   TZ.Particles.spawnExplosion(this.x, this.y, this.color, 14, 1.2);
+  TZ.Audio.play('item');
 };
 
 TZ.Item.prototype.draw = function (ctx) {

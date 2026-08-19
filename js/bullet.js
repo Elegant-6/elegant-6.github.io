@@ -14,6 +14,7 @@ TZ.Bullet = function (o) {
 };
 
 TZ.Bullet.prototype.update = function (dt, app) {
+  if (this.dead) return;
   var C = TZ.Config;
   this.life -= dt;
   if (this.life <= 0) { this.explode(app); this.dead = true; return; }
@@ -46,7 +47,6 @@ TZ.Bullet.prototype.update = function (dt, app) {
   if (hit === 'brick' || hit === 'steel') {
     if (hit === 'brick') { app.map.grid[r][c] = 0; TZ.Particles.spawnText(this.x, this.y, '破坏', '#ffd23f'); }
     TZ.Particles.spawnHit(this.x, this.y, this.color);
-    TZ.Audio.play('hit');
     this.explode(app);
     this.dead = true;
     return;
@@ -91,7 +91,6 @@ TZ.Bullet.prototype.hitBase = function (app) {
   if (!app.base || !app.base.alive) return;
   app.base.hp -= this.damage;
   TZ.Particles.spawnText(app.base.x, app.base.y - 20, '基地受损', '#ff2e4d');
-  TZ.Audio.play('hit');
   if (app.base.hp <= 0) {
     app.base.hp = 0;
     app.base.alive = false;
@@ -102,7 +101,6 @@ TZ.Bullet.prototype.hitBase = function (app) {
 TZ.Bullet.prototype.explode = function (app) {
   if (this.splash > 0) {
     TZ.Particles.spawnExplosion(this.x, this.y, this.color, 24, 2);
-    TZ.Audio.play('boom');
     if (this.owner === 'player') {
       for (var i = 0; i < app.enemies.length; i++) {
         var e = app.enemies[i];
@@ -116,8 +114,7 @@ TZ.Bullet.prototype.explode = function (app) {
     }
   } else if (this.big) {
     TZ.Particles.spawnExplosion(this.x, this.y, this.color, 20, 1.6);
-    TZ.Audio.play('boom');
-  } else {
+    } else {
     TZ.Particles.spawnHit(this.x, this.y, this.color);
   }
 };

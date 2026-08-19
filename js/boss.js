@@ -6,10 +6,12 @@ TZ.Boss = function (key) {
   this.size = d.size;
   this.phases = d.phases;
   this.phase = 1;
-  this.maxHp = d.hp;
-  this.hp = d.hp;
-  this.speed = d.speed;
-  this.attack = 40;
+  var eb = TZ.Level.enemyBoost();
+  this.maxHp = Math.round(d.hp * (1 + eb));
+  this.hp = this.maxHp;
+  this.speed = Math.round(d.speed * (1 + eb));
+  this.attack = Math.round(40 * (1 + eb));
+  this.goldVal = 200;
   this.armor = d.armor || 0;
   this.img = d.img ? TZ.Images['B_' + key] : null;
   this.x = TZ.Config.W / 2;
@@ -24,6 +26,11 @@ TZ.Boss = function (key) {
   this.cast = null;
   this.radius = this.size * 0.5;
   this.skills = d.skills.slice();
+  this.contactCd = 0;
+};
+
+TZ.Boss.prototype.ramDamage = function () {
+  return 2 * (20 + this.phase * 5);
 };
 
 TZ.Boss.prototype.box = function () {
@@ -36,6 +43,7 @@ TZ.Boss.prototype.takeDamage = function (dmg) {
   this.hp -= dmg2;
   TZ.Particles.spawnHit(this.x + TZ.u.rand(-40, 40), this.y + TZ.u.rand(-40, 40), this.color);
   TZ.Particles.spawnText(this.x, this.y - this.size * 0.8, '-' + Math.round(dmg2), '#ffd23f');
+  TZ.Audio.play('enemyHit');
   var thresh = this.maxHp * (1 - this.phase / this.phases);
   if (this.hp <= thresh && this.phase < this.phases) {
     this.phase++;
@@ -43,8 +51,7 @@ TZ.Boss.prototype.takeDamage = function (dmg) {
     this.skillCd = 1.2;
     TZ.Particles.spawnExplosion(this.x, this.y, this.color, 40, 3);
     TZ.Particles.spawnText(this.x, this.y - this.size, '警告！阶段 ' + this.phase, '#ff2e4d');
-    TZ.Audio.play('warn');
-  }
+    }
   if (this.hp <= 0) {
     this.hp = 0;
     this.die();
@@ -55,8 +62,13 @@ TZ.Boss.prototype.die = function () {
   this.alive = false;
   TZ.Particles.spawnExplosion(this.x, this.y, this.color, 60, 4);
   TZ.Particles.addShake(16);
-  TZ.Audio.play('nuke');
-};
+  TZ.Audio.play('boom');
+  if (TZ.Game.app) {
+    TZ.Game.app.goldEarned = (TZ.Game.app.goldEarned || 0) + this.goldVal;
+    TZ.Particles.spawnText(this.x, this.y - this.size * 0.9, '+' + this.goldVal + ' G', '#ffd23f');
+  }
+  TZ.Level.addGold(this.goldVal);
+  };
 
 TZ.Boss.prototype.update = function (dt, app) {
   if (!this.alive) return;
@@ -83,6 +95,14 @@ TZ.Boss.prototype.update = function (dt, app) {
   this.x = TZ.u.clamp(this.x, 60, TZ.Config.W - 60);
   this.y = TZ.u.clamp(this.y, 80, TZ.Config.H * 0.45);
 
+  if (this.contactCd > 0) this.contactCd -= dt;
+  if (p && p.alive && this.contactCd <= 0 &&
+      TZ.u.dist(this.x, this.y, p.x, p.y) < this.size * 0.5 + p.w * 0.4) {
+    p.takeDamage(this.ramDamage());
+    this.contactCd = 1;
+    TZ.Particles.addShake(8);
+  }
+
   if (this.cast) { this.runCast(dt, app); return; }
   this.skillCd -= dt;
   if (this.skillCd <= 0 && p && p.alive) this.startCast(app);
@@ -97,8 +117,8 @@ TZ.Boss.prototype.startCast = function (app) {
     case 'fan':     this.cast = { type:'fan', ang:ang }; this.fireFan(app); this.skillCd = 4.5; break;
     case 'ring':    this.cast = { type:'ring' }; this.fireRing(app); this.skillCd = 5; break;
     case 'homing':  this.cast = { type:'homing' }; this.fireHoming(app); this.skillCd = 6; break;
-    case 'laser':   this.cast = { type:'laser', t:0.7, ang:ang, beam:0 }; TZ.Audio.play('warn'); this.skillCd = 7; break;
-    case 'charge':  this.cast = { type:'charge', phase:'wind', t:0.7, ang:ang }; this.skillCd = 6; break;
+    case 'laser':   this.cast = { type:'laser', t:0.7, ang:ang, beam:0 }; this.skillCd = 7; TZ.Audio.play('skill'); break;
+    case 'charge':  this.cast = { type:'charge', phase:'wind', t:0.7, ang:ang }; this.skillCd = 6; TZ.Audio.play('skill'); break;
     case 'summon':  this.cast = { type:'summon' }; this.fireSummon(app); this.skillCd = 7; break;
     case 'meteor':  this.cast = { type:'meteor' }; this.fireMeteor(app); this.skillCd = 7; break;
   }
@@ -113,6 +133,7 @@ TZ.Boss.prototype.fireFan = function (app) {
       damage:20 + this.phase * 5, owner:'boss', color:'#ff8c3a', size:8
     }));
   }
+  TZ.Audio.play('fire');
 };
 
 TZ.Boss.prototype.fireRing = function (app) {
@@ -124,6 +145,7 @@ TZ.Boss.prototype.fireRing = function (app) {
       damage:15 + this.phase * 5, owner:'boss', color:'#ffd23f', size:7
     }));
   }
+  TZ.Audio.play('fire');
 };
 
 TZ.Boss.prototype.fireHoming = function (app) {
@@ -160,8 +182,7 @@ TZ.Boss.prototype.runCast = function (dt, app) {
     if (c.t <= 0 && c.beam === 0) {
       c.beam = 1.2;
       c.t = 1.2;
-      TZ.Audio.play('laser');
-    }
+      }
     if (c.beam > 0 && c.t > 0) {
       var p = app.player;
       if (p && p.alive) {
@@ -184,8 +205,7 @@ TZ.Boss.prototype.runCast = function (dt, app) {
         c.t = 0.45;
         this.vx = Math.cos(c.ang) * 700;
         this.vy = Math.sin(c.ang) * 700;
-        TZ.Audio.play('dash');
-      }
+        }
       return;
     }
     if (c.phase === 'dash') {
@@ -194,7 +214,7 @@ TZ.Boss.prototype.runCast = function (dt, app) {
       this.x = TZ.u.clamp(this.x, 50, TZ.Config.W - 50);
       this.y = TZ.u.clamp(this.y, 60, TZ.Config.H - 140);
       var p = app.player;
-      if (p && p.alive && TZ.u.dist(this.x, this.y, p.x, p.y) < this.size * 0.6) p.takeDamage(40);
+      if (p && p.alive && TZ.u.dist(this.x, this.y, p.x, p.y) < this.size * 0.6) p.takeDamage(this.ramDamage());
       c.t -= dt;
       if (c.t <= 0) this.cast = null;
       return;
