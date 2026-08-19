@@ -28,6 +28,7 @@ TZ.Input = (function () {
   addEventListener('keyup', function (e) { down[e.code] = false; });
   addEventListener('blur', function () { for (var k in down) down[k] = false; });
   addEventListener('mousemove', function (e) {
+    if (touchMode) return;
     var cv = document.getElementById('gameCanvas');
     if (!cv) return;
     var r = cv.getBoundingClientRect();
@@ -37,10 +38,13 @@ TZ.Input = (function () {
     mouse.present = true;
   });
   addEventListener('mousedown', function (e) {
+    if (touchMode) return;
+    if (e.target && e.target.closest && e.target.closest('button, .tank-card, .boss-card, .level-cell')) return;
     if (e.button === 0) mouse.left = true;
     if (e.button === 2) { mouse.right = true; e.preventDefault(); }
   });
   addEventListener('mouseup', function (e) {
+    if (touchMode) return;
     if (e.button === 0) mouse.left = false;
     if (e.button === 2) mouse.right = false;
   });
@@ -60,7 +64,7 @@ TZ.Input = (function () {
       }
     }
     e.preventDefault();
-  });
+  }, { passive:false });
   addEventListener('touchmove', function (e) {
     if (document.querySelector('.screen.active')) return;
     for (var i = 0; i < e.changedTouches.length; i++) {
@@ -70,7 +74,7 @@ TZ.Input = (function () {
       else if (aim.active && t.identifier === aim.id) { aim.x = pt.x; aim.y = pt.y; }
     }
     e.preventDefault();
-  });
+  }, { passive:false });
   addEventListener('touchend', function (e) {
     for (var i = 0; i < e.changedTouches.length; i++) {
       var t = e.changedTouches[i];
@@ -116,6 +120,13 @@ TZ.Input = (function () {
 
   function triggerSkill() { skillTap = true; }
 
+  function resetPointer() {
+    mouse.left = false; mouse.right = false; mouse.present = false;
+    skillTap = false;
+    joy.active = false; joy.id = null;
+    aim.active = false; aim.id = null;
+  }
+
   return {
     down: down,
     axis: axis,
@@ -130,6 +141,7 @@ TZ.Input = (function () {
       return v;
     },
     triggerSkill: triggerSkill,
+    resetPointer: resetPointer,
     isTouch: function () { return touchMode; }
   };
 })();

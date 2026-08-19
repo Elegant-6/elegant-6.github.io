@@ -251,6 +251,7 @@ TZ.Game = (function () {
       }
 
     app.player = new TZ.Player(tankKey);
+    TZ.Input.resetPointer();
     document.getElementById('hud-avatar').src = TZ.Config.TANKS[tankKey].img;
     TZ.UI.hideAll();
     TZ.UI.showHud(true);
@@ -493,6 +494,11 @@ TZ.Game = (function () {
     start('adventure', app.tankKey);
   }
 
+  function startLevel(chapter, level, tankKey) {
+    pendingStart = { chapter:chapter, level:level };
+    start('adventure', tankKey || TZ.UI.selectedTank);
+  }
+
   function pause(v) {
     if (!app || app.scene !== 'playing') return;
     app.paused = v;
@@ -602,6 +608,7 @@ TZ.Game = (function () {
     get app() { return app; },
     init: init,
     start: start,
+    startLevel: startLevel,
     restart: restart,
     nextLevel: nextLevel,
     pause: pause,

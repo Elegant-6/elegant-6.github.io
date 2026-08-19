@@ -55,6 +55,14 @@ TZ.UI = (function () {
         buildTankCards();
         show('screen-select');
         break;
+      case 'levels':
+        buildLevels();
+        show('screen-levels');
+        break;
+      case 'back-select':
+        buildTankCards();
+        show('screen-select');
+        break;
       case 'mode-endless':
         pendingMode = 'endless';
         buildTankCards();
@@ -225,6 +233,33 @@ TZ.UI = (function () {
         wrap.appendChild(el);
       })(keys[i], i);
     }
+  }
+
+  function buildLevels() {
+    var wrap = $('level-grid');
+    wrap.innerHTML = '';
+    var pr = TZ.Save.progressIndex();
+    for (var c = 0; c < TZ.Config.CHAPTERS; c++) {
+      for (var l = 0; l < TZ.Config.LEVELS_PER_CHAPTER; l++) {
+        (function (c, l) {
+          var idx = c * TZ.Config.LEVELS_PER_CHAPTER + l;
+          var num = idx + 1;
+          var unlocked = idx <= pr;
+          var el = document.createElement('button');
+          el.className = 'level-cell' + (unlocked ? '' : ' locked') + (l === 4 ? ' boss' : '');
+          el.textContent = num;
+          if (unlocked) {
+            el.addEventListener('click', function () {
+              TZ.Audio.play('click');
+              TZ.Game.startLevel(c, l);
+            });
+          }
+          wrap.appendChild(el);
+        })(c, l);
+      }
+    }
+    var hint = $('level-hint');
+    if (hint) hint.textContent = '已解锁 ' + Math.min(pr + 1, TZ.Config.CHAPTERS * TZ.Config.LEVELS_PER_CHAPTER) + ' / ' + (TZ.Config.CHAPTERS * TZ.Config.LEVELS_PER_CHAPTER) + ' 关';
   }
 
   function renderLeaderboard() {

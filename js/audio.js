@@ -23,7 +23,7 @@ window.TZ = window.TZ || {};
 
   function unlock() {
     if (!ensure()) return;
-    if (!bgm) startBGM();
+    if (!bgmEl) startBGM();
   }
   if (typeof document !== 'undefined') {
     document.addEventListener('pointerdown', unlock);
