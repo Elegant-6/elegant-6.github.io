@@ -1,7 +1,7 @@
 window.TZ = window.TZ || {};
 
 (function () {
-  var ctx = null, master = null, musicGain = null, bgm = null, bgmOn = true;
+  var ctx = null, master = null, musicGain = null, bgmEl = null, bgmOn = true, bgmSrc = '卡农 - 文武贝.mp3';
 
   function ensure() {
     if (!ctx) {
@@ -79,85 +79,17 @@ window.TZ = window.TZ || {};
     if (fn) fn(ctx.currentTime + 0.01);
   }
 
-  var R3 = 1.189207115, R5 = 1.498307077, R2 = 2;
-
-  function addTone(d, sr, start, dur, freq, type, vol) {
-    var n = Math.floor(start * sr), m = Math.max(1, Math.floor(dur * sr));
-    for (var i = 0; i < m; i++) {
-      if (n + i >= d.length) break;
-      var t = i / sr;
-      var env = Math.pow(1 - t / dur, 2) * vol;
-      var ph = t * freq;
-      var v;
-      if (type === 'sine') v = Math.sin(2 * Math.PI * ph);
-      else if (type === 'square') v = ph % 1 < 0.5 ? 1 : -1;
-      else v = 2 * (ph % 1) - 1;
-      d[n + i] += env * v;
-    }
-  }
-
-  function addKick(d, sr, start, dur, vol) {
-    var n = Math.floor(start * sr), m = Math.max(1, Math.floor(dur * sr));
-    for (var i = 0; i < m; i++) {
-      if (n + i >= d.length) break;
-      var t = i / sr;
-      var f = 120 - (t / dur) * 80;
-      var env = (1 - t / dur) * vol;
-      d[n + i] += Math.sin(2 * Math.PI * f * t) * env;
-    }
-  }
-
-  function addHihat(d, sr, start, dur, vol) {
-    var n = Math.floor(start * sr), m = Math.max(1, Math.floor(dur * sr));
-    for (var i = 0; i < m; i++) {
-      if (n + i >= d.length) break;
-      var t = i / sr;
-      var env = (1 - t / dur) * vol;
-      d[n + i] += (Math.random() * 2 - 1) * env;
-    }
-  }
-
-  function buildBGM() {
-    var bpm = 132, spb = 60 / bpm, sr = ctx.sampleRate;
-    var bars = 8, total = bars * 4 * spb;
-    var len = Math.floor(sr * total);
-    var buf = ctx.createBuffer(1, len, sr);
-    var d = buf.getChannelData(0);
-    var prog = [220.0, 174.61, 196.0, 164.81];
-    var seq = [1, R3, R5, R2, R5, R3, R5, R2, R5, R3, 1, R3, R5, R2, R5, R3];
-    var stepDur = spb / 4;
-    for (var bar = 0; bar < bars; bar++) {
-      var root = prog[bar % 4];
-      var barT = bar * 4 * spb;
-      for (var b = 0; b < 4; b++) {
-        var bt = barT + b * spb;
-        addTone(d, sr, bt, spb * 0.22, root / 2, 'square', 0.16);
-        addKick(d, sr, bt, 0.10, 0.40);
-        addHihat(d, sr, bt + spb / 2, 0.03, 0.03);
-      }
-      for (var s = 0; s < 16; s++) {
-        addTone(d, sr, barT + s * stepDur, stepDur * 0.9, root * seq[s], 'saw', 0.045);
-      }
-    }
-    var peak = 0;
-    for (var i = 0; i < len; i++) { var a = Math.abs(d[i]); if (a > peak) peak = a; }
-    if (peak > 0) {
-      var k = 0.9 / peak;
-      for (var i = 0; i < len; i++) d[i] *= k;
-    }
-    return buf;
-  }
-
   function startBGM() {
-    if (!ensure() || bgm) return;
+    if (!ensure() || bgmEl || !bgmSrc) return;
     try {
-      var buf = buildBGM();
-      bgm = ctx.createBufferSource();
-      bgm.buffer = buf;
-      bgm.loop = true;
-      bgm.connect(musicGain);
-      bgm.start();
-    } catch (e) {}
+      bgmEl = new Audio(bgmSrc);
+      bgmEl.loop = true;
+      bgmEl.volume = 0.5;
+      var src = ctx.createMediaElementSource(bgmEl);
+      src.connect(musicGain);
+      var pr = bgmEl.play();
+      if (pr && pr.then) pr.catch(function () {});
+    } catch (e) { bgmEl = null; }
   }
 
   function setMusic(on) {
@@ -175,6 +107,7 @@ window.TZ = window.TZ || {};
     setMusic: setMusic,
     setVolume: setVolume,
     ensure: ensure,
-    get ready() { return !!ctx; }
+    get ready() { return !!ctx; },
+    set bgmSrc(v) { bgmSrc = v; }
   };
 })();
