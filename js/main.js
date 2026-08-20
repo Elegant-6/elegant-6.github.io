@@ -134,6 +134,66 @@ TZ.Game = (function () {
   var last = 0, acc = 0;
   var pendingStart = null;
 
+  function trimBossSprite(img) {
+    var w = img.naturalWidth, h = img.naturalHeight;
+    if (!w || !h) return img;
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var t = c.getContext('2d');
+    t.drawImage(img, 0, 0);
+    var id, d;
+    try { id = t.getImageData(0, 0, w, h); } catch (e) { return img; }
+    d = id.data;
+    var lab = new Int32Array(w * h);
+    var stack = new Int32Array(w * h);
+    var best = { area: 0, minX: w, minY: h, maxX: -1, maxY: -1 };
+    var cur = 0;
+    for (var sy = 0; sy < h; sy++) {
+      for (var sx = 0; sx < w; sx++) {
+        var si = (sy * w + sx) * 4;
+        var isC = d[si] < 238 || d[si + 1] < 238 || d[si + 2] < 238;
+        if (!isC || lab[si >> 2]) continue;
+        cur++;
+        var sp = 0, area = 0, minX = w, minY = h, maxX = -1, maxY = -1;
+        stack[sp++] = sx; stack[sp++] = sy;
+        lab[si >> 2] = cur;
+        while (sp > 0) {
+          var y = stack[--sp], x = stack[--sp];
+          area++;
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+          if (x > 0 && !lab[y * w + x - 1]) {
+            var li = (y * w + x - 1) * 4;
+            if (d[li] < 238 || d[li + 1] < 238 || d[li + 2] < 238) { lab[y * w + x - 1] = cur; stack[sp++] = x - 1; stack[sp++] = y; }
+          }
+          if (x < w - 1 && !lab[y * w + x + 1]) {
+            var ri = (y * w + x + 1) * 4;
+            if (d[ri] < 238 || d[ri + 1] < 238 || d[ri + 2] < 238) { lab[y * w + x + 1] = cur; stack[sp++] = x + 1; stack[sp++] = y; }
+          }
+          if (y > 0 && !lab[(y - 1) * w + x]) {
+            var ui = ((y - 1) * w + x) * 4;
+            if (d[ui] < 238 || d[ui + 1] < 238 || d[ui + 2] < 238) { lab[(y - 1) * w + x] = cur; stack[sp++] = x; stack[sp++] = y - 1; }
+          }
+          if (y < h - 1 && !lab[(y + 1) * w + x]) {
+            var bi = ((y + 1) * w + x) * 4;
+            if (d[bi] < 238 || d[bi + 1] < 238 || d[bi + 2] < 238) { lab[(y + 1) * w + x] = cur; stack[sp++] = x; stack[sp++] = y + 1; }
+          }
+        }
+        if (area > best.area) { best = { area: area, minX: minX, minY: minY, maxX: maxX, maxY: maxY }; }
+      }
+    }
+    for (var i2 = 0; i2 < d.length; i2 += 4) {
+      if (d[i2] > 235 && d[i2 + 1] > 235 && d[i2 + 2] > 235) d[i2 + 3] = 0;
+    }
+    t.putImageData(id, 0, 0);
+    if (best.maxX < 0) return c;
+    var cw = best.maxX - best.minX + 1, ch = best.maxY - best.minY + 1;
+    var c2 = document.createElement('canvas');
+    c2.width = cw; c2.height = ch;
+    c2.getContext('2d').drawImage(c, best.minX, best.minY, cw, ch, 0, 0, cw, ch);
+    return c2;
+  }
+
   function init() {
     TZ.Images = {};
     var keys = Object.keys(TZ.Config.TANKS);
@@ -154,9 +214,14 @@ TZ.Game = (function () {
     for (var i = 0; i < bkeys.length; i++) {
       var bd = TZ.Config.BOSSES[bkeys[i]];
       if (!bd.img) continue;
-      var bimg = new Image();
-      bimg.src = bd.img;
-      TZ.Images['B_' + bkeys[i]] = bimg;
+      (function (key, src) {
+        var bimg = new Image();
+        bimg.onload = function () {
+          try { TZ.Images['SB_' + key] = trimBossSprite(bimg); } catch (e) { TZ.Images['SB_' + key] = bimg; }
+        };
+        bimg.src = src;
+        TZ.Images['B_' + key] = bimg;
+      })(bkeys[i], bd.img);
     }
 
     canvas = document.getElementById('gameCanvas');
@@ -395,7 +460,7 @@ TZ.Game = (function () {
       if (m.t <= 0) {
         TZ.Particles.spawnExplosion(m.x, m.y, '#ff2e4d', 30, 3);
         var p = app.player;
-        if (p && p.alive && TZ.u.dist(m.x, m.y, p.x, p.y) < m.r) p.takeDamage(30);
+        if (p && p.alive && TZ.u.dist(m.x, m.y, p.x, p.y) < m.r) p.takeDamage(50);
         TZ.Particles.addShake(8);
         app.meteors.splice(i, 1);
       }

@@ -10,7 +10,7 @@ TZ.Boss = function (key) {
   this.maxHp = Math.round(d.hp * (1 + eb));
   this.hp = this.maxHp;
   this.speed = Math.round(d.speed * (1 + eb));
-  this.attack = Math.round(40 * (1 + eb));
+  this.attack = Math.round(60 * (1 + eb));
   this.goldVal = 200;
   this.armor = d.armor || 0;
   this.img = d.img ? TZ.Images['B_' + key] : null;
@@ -30,7 +30,7 @@ TZ.Boss = function (key) {
 };
 
 TZ.Boss.prototype.ramDamage = function () {
-  return 2 * (20 + this.phase * 5);
+  return 2 * (30 + this.phase * 7);
 };
 
 TZ.Boss.prototype.box = function () {
@@ -129,8 +129,8 @@ TZ.Boss.prototype.fireFan = function (app) {
   for (var i = 0; i < n; i++) {
     var a = this.cast.ang + (i - (n - 1) / 2) * 0.22;
     app.bullets.push(new TZ.Bullet({
-      x:this.x, y:this.y, vx:Math.cos(a) * 330, vy:Math.sin(a) * 330,
-      damage:20 + this.phase * 5, owner:'boss', color:'#ff8c3a', size:8
+      x:this.x, y:this.y, vx:Math.cos(a) * 380, vy:Math.sin(a) * 380,
+      damage:30 + this.phase * 7, owner:'boss', color:'#ff8c3a', size:8
     }));
   }
   TZ.Audio.play('fire');
@@ -141,8 +141,8 @@ TZ.Boss.prototype.fireRing = function (app) {
   for (var i = 0; i < n; i++) {
     var a = i / n * Math.PI * 2;
     app.bullets.push(new TZ.Bullet({
-      x:this.x, y:this.y, vx:Math.cos(a) * 260, vy:Math.sin(a) * 260,
-      damage:15 + this.phase * 5, owner:'boss', color:'#ffd23f', size:7
+      x:this.x, y:this.y, vx:Math.cos(a) * 300, vy:Math.sin(a) * 300,
+      damage:25 + this.phase * 7, owner:'boss', color:'#ffd23f', size:7
     }));
   }
   TZ.Audio.play('fire');
@@ -154,8 +154,8 @@ TZ.Boss.prototype.fireHoming = function (app) {
     var a = ang + (i - 1) * 0.5;
     app.bullets.push(new TZ.Bullet({
       x:this.x + Math.cos(a) * 40, y:this.y + Math.sin(a) * 40,
-      vx:Math.cos(a) * 300, vy:Math.sin(a) * 300,
-      damage:25 + this.phase * 5, owner:'boss', color:'#ff2e4d', size:9, homing:2.6, life:4
+      vx:Math.cos(a) * 340, vy:Math.sin(a) * 340,
+      damage:35 + this.phase * 7, owner:'boss', color:'#ff2e4d', size:9, homing:2.6, life:4
     }));
   }
 };
@@ -190,7 +190,7 @@ TZ.Boss.prototype.runCast = function (dt, app) {
         var px = p.x - this.x, py = p.y - this.y;
         var proj = px * rx + py * ry;
         var perp = Math.abs(px * -ry + py * rx);
-        if (proj > 0 && proj < 900 && perp < 26) p.takeDamage(60 * dt);
+        if (proj > 0 && proj < 900 && perp < 26) p.takeDamage(85 * dt);
       }
     }
     if (c.t <= 0) this.cast = null;
@@ -203,8 +203,8 @@ TZ.Boss.prototype.runCast = function (dt, app) {
       if (c.t <= 0) {
         c.phase = 'dash';
         c.t = 0.45;
-        this.vx = Math.cos(c.ang) * 700;
-        this.vy = Math.sin(c.ang) * 700;
+        this.vx = Math.cos(c.ang) * 800;
+        this.vy = Math.sin(c.ang) * 800;
         }
       return;
     }
@@ -240,8 +240,14 @@ TZ.Boss.prototype.draw = function (ctx) {
   ctx.beginPath(); ctx.arc(0, 0, s * 0.75, 0, 7); ctx.fill();
   ctx.restore();
 
-  if (this.img && this.img.complete && this.img.naturalWidth > 0) {
-    ctx.drawImage(this.img, -s * 0.6, -s * 0.6, s * 1.2, s * 1.2);
+  var sp = TZ.Images['SB_' + this.key] || this.img;
+  var spReady = sp && (sp.complete === undefined ? sp.width > 0 : sp.complete && sp.naturalWidth > 0);
+  if (spReady) {
+    var iw = sp.naturalWidth || sp.width, ih = sp.naturalHeight || sp.height;
+    var box = s * 1.2;
+    var k = Math.min(box / iw, box / ih);
+    var dw = iw * k, dh = ih * k;
+    ctx.drawImage(sp, -dw / 2, -dh / 2, dw, dh);
   } else {
     ctx.save();
     ctx.rotate(this.rot * 0.3);

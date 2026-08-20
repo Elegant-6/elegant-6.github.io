@@ -30,10 +30,10 @@ window.TZ = window.TZ || {};
   };
 
   var BOSSES = {
-    ironGolem:    { key:'ironGolem',    name:'铁甲巨兽', hp:3000, speed:55, color:'#e67e22', size:96,  phases:2, skills:['fan','charge','summon'] },
-    voltLord:     { key:'voltLord',     name:'电磁主宰', hp:2500, speed:85, color:'#00d2ff', size:84,  phases:2, skills:['ring','homing','laser'] },
-    doomFortress: { key:'doomFortress', name:'末日要塞', hp:5000, speed:40, color:'#ff2e4d', size:116, phases:3, skills:['fan','ring','laser','summon','charge','homing','meteor'] },
-    bossTank: { key:'bossTank', name:'BOSS坦克', type:'攻击型', hp:4000, speed:70, color:'#ff4d6d', size:104, phases:2, armor:1, skills:['fan','laser','charge'], img:'assets/tanks/boss_tank.png' }
+    ironGolem:    { key:'ironGolem',    name:'铁甲巨兽', hp:4500, speed:66, color:'#e67e22', size:96,  phases:2, skills:['fan','charge','summon'], img:'assets/tanks/boss_irongolem.png' },
+    voltLord:     { key:'voltLord',     name:'电磁主宰', hp:3800, speed:100, color:'#00d2ff', size:84,  phases:2, skills:['ring','homing','laser'], img:'assets/tanks/boss_voltlord.png' },
+    doomFortress: { key:'doomFortress', name:'末日要塞', hp:7500, speed:48, color:'#ff2e4d', size:116, phases:3, skills:['fan','ring','laser','summon','charge','homing','meteor'], img:'assets/tanks/boss_doomfortress.png' },
+    bossTank: { key:'bossTank', name:'BOSS坦克', type:'攻击型', hp:6000, speed:84, color:'#ff4d6d', size:104, phases:2, armor:2, skills:['fan','laser','charge'], img:'assets/tanks/boss_tank.png' }
   };
 
   var ITEMS = {
