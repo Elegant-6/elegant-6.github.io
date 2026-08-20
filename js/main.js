@@ -96,6 +96,21 @@ TZ.Level = {
   enemyBoost: function () {
     return (this.get() - 1) * 0.01 * 0.3;
   },
+  tankExtra: function (key) {
+    var lv = this.get();
+    var b = (lv - 1) * 0.01;
+    var s = (lv - 1) * 0.005;
+    var ex = { bulletSpeed:0, splash:0, nukeDmg:0, nukeSplash:0, dashDmg:0, shield:0 };
+    if (key === 'default') ex.bulletSpeed = Math.round(480 * (1 + s));
+    if (key === 'blast') {
+      ex.splash = 64 * (1 + b);
+      ex.nukeDmg = Math.round(120 * (1 + b));
+      ex.nukeSplash = 150 * (1 + b);
+    }
+    if (key === 'lightning') ex.dashDmg = Math.round(60 * (1 + b));
+    if (key === 'guard') ex.shield = Math.round(80 * (1 + b));
+    return ex;
+  },
   canUpgrade: function () {
     return this.get() < this.MAX && this.gold() >= this.cost(this.get());
   },
@@ -252,6 +267,7 @@ TZ.Game = (function () {
 
     app.player = new TZ.Player(tankKey);
     TZ.Input.resetPointer();
+    TZ.Input.clearPressed();
     document.getElementById('hud-avatar').src = TZ.Config.TANKS[tankKey].img;
     TZ.UI.hideAll();
     TZ.UI.showHud(true);

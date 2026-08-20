@@ -132,6 +132,7 @@ TZ.UI = (function () {
   function show(id) {
     for (var k in screens) screens[k].classList.remove('active');
     if (screens[id]) screens[id].classList.add('active');
+    TZ.Input.clearPressed();
   }
 
   function hide(id) {

@@ -23,12 +23,28 @@ window.TZ = window.TZ || {};
 
   function unlock() {
     if (!ensure()) return;
-    if (!bgmEl) startBGM();
+    if (bgmEl) {
+      bgmEl.muted = !bgmOn;
+      if (bgmEl.paused) { var pr = bgmEl.play(); if (pr && pr.then) pr.catch(function () {}); }
+    } else if (bgmSrc) {
+      startBGM();
+    }
   }
   if (typeof document !== 'undefined') {
+    function tryAutoplay() { if (bgmSrc && !window.__TZ_NO_AUTOPLAY__) startBGM(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tryAutoplay);
+    else tryAutoplay();
     document.addEventListener('pointerdown', unlock);
     document.addEventListener('keydown', unlock);
     document.addEventListener('touchend', unlock);
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) return;
+      if (ctx && ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
+      if (bgmEl && bgmOn) {
+        bgmEl.muted = false;
+        if (bgmEl.paused) { var pr = bgmEl.play(); if (pr && pr.then) pr.catch(function () {}); }
+      }
+    });
   }
 
   function tone(freq, t, dur, type, vol) {
@@ -80,13 +96,17 @@ window.TZ = window.TZ || {};
   }
 
   function startBGM() {
-    if (!ensure() || bgmEl || !bgmSrc) return;
+    if (bgmEl || !bgmSrc) return;
     try {
       bgmEl = new Audio(bgmSrc);
       bgmEl.loop = true;
       bgmEl.volume = 0.5;
-      var src = ctx.createMediaElementSource(bgmEl);
-      src.connect(musicGain);
+      bgmEl.muted = true;
+      ensure();
+      if (ctx) {
+        var src = ctx.createMediaElementSource(bgmEl);
+        src.connect(musicGain);
+      }
       var pr = bgmEl.play();
       if (pr && pr.then) pr.catch(function () {});
     } catch (e) { bgmEl = null; }
@@ -95,6 +115,7 @@ window.TZ = window.TZ || {};
   function setMusic(on) {
     bgmOn = on;
     if (musicGain) musicGain.gain.value = on ? 0.3 : 0;
+    if (bgmEl) bgmEl.muted = !on;
   }
 
   function setVolume(v) {
@@ -104,10 +125,12 @@ window.TZ = window.TZ || {};
   TZ.Audio = {
     play: play,
     startBGM: startBGM,
+    unlock: unlock,
     setMusic: setMusic,
     setVolume: setVolume,
     ensure: ensure,
     get ready() { return !!ctx; },
+    get bgmEl() { return bgmEl; },
     set bgmSrc(v) { bgmSrc = v; }
   };
 })();

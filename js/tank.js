@@ -19,7 +19,7 @@ Tank.prototype.canMoveTo = function (g, x, y) {
   }
   var x1 = TZ.u.clamp(x - hw, 0, C.W), y1 = TZ.u.clamp(y - hh, 0, C.H);
   var x2 = TZ.u.clamp(x + hw, 0, C.W), y2 = TZ.u.clamp(y + hh, 0, C.H);
-  return x2 - x1 >= this.w && y2 - y1 >= this.h;
+  return x2 - x1 >= this.w - 0.001 && y2 - y1 >= this.h - 0.001;
 };
 
 Tank.prototype.canMoveX = function (g, dx) {
@@ -32,7 +32,7 @@ Tank.prototype.canMoveX = function (g, dx) {
   var r1 = Math.floor(top / C.TILE), r2 = Math.floor(bot / C.TILE);
   for (var r = r1; r <= r2; r++) if (TZ.Map.solidAt(g, c, r)) return false;
   var x1 = TZ.u.clamp(nx - hw, 0, C.W), x2 = TZ.u.clamp(nx + hw, 0, C.W);
-  return x2 - x1 >= this.w;
+  return x2 - x1 >= this.w - 0.001;
 };
 
 Tank.prototype.canMoveY = function (g, dy) {
@@ -45,7 +45,7 @@ Tank.prototype.canMoveY = function (g, dy) {
   var c1 = Math.floor(left / C.TILE), c2 = Math.floor(right / C.TILE);
   for (var c = c1; c <= c2; c++) if (TZ.Map.solidAt(g, c, r)) return false;
   var y1 = TZ.u.clamp(ny - hh, 0, C.H), y2 = TZ.u.clamp(ny + hh, 0, C.H);
-  return y2 - y1 >= this.h;
+  return y2 - y1 >= this.h - 0.001;
 };
 
 Tank.prototype.slideMove = function (g, vx, vy) {
@@ -90,7 +90,13 @@ function Player(key) {
   this.speed = Math.round(d.speed * m.spd);
   this.attack = Math.round(d.attack * m.atk);
   this.fireRate = d.fireRate * m.rate;
-  this.bulletSpeed = d.bulletSpeed;
+  var ex = TZ.Level.tankExtra(key);
+  this.bulletSpeed = ex.bulletSpeed || d.bulletSpeed;
+  this.splashRadius = ex.splash || 0;
+  this.nukeDmg = ex.nukeDmg || 120;
+  this.nukeSplash = ex.nukeSplash || 150;
+  this.dashDamage = ex.dashDmg || 60;
+  this.skillShield = ex.shield || 80;
   this.armor = d.armor;
   this.fireLevel = 1;
   this.effects = { double:0, pierce:0, speed:0 };
@@ -137,7 +143,7 @@ Player.prototype.update = function (dt, app) {
       var e = app.enemies[i];
       if (!e.alive) continue;
       if (TZ.u.dist(this.x, this.y, e.x, e.y) < 46) {
-        e.takeDamage(60, app);
+        e.takeDamage(this.dashDamage, app);
         TZ.Particles.spawnHit(e.x, e.y, this.color);
       }
     }
@@ -165,7 +171,7 @@ Player.prototype.fire = function (app) {
       x:this.x + vx * 0.03, y:this.y + vy * 0.03,
       vx:vx, vy:vy,
       damage:this.attack, owner:'player', color:this.color,
-      splash:isBlast ? 64 : 0, size:isBlast ? 9 : 6,
+      splash:isBlast ? this.splashRadius : 0, size:isBlast ? 9 : 6,
       pierce:this.effects.pierce > 0 ? 99 : 0,
       big:isBlast
     }));
@@ -186,8 +192,8 @@ Player.prototype.useSkill = function (app) {
       app.bullets.push(new TZ.Bullet({
         x:this.x, y:this.y,
         vx:Math.sin(base) * 380, vy:-Math.cos(base) * 380,
-        damage:120, owner:'player', color:'#ff2e4d',
-        splash:150, size:15, big:true, life:2
+        damage:this.nukeDmg, owner:'player', color:'#ff2e4d',
+        splash:this.nukeSplash, size:15, big:true, life:2
       }));
       break;
     }
@@ -196,7 +202,7 @@ Player.prototype.useSkill = function (app) {
       TZ.Audio.play('dash');
       break;
     case 'shield':
-      this.shield = Math.max(this.shield, 80);
+      this.shield = Math.max(this.shield, this.skillShield);
       this.shieldTimer = 10;
       break;
   }
@@ -292,6 +298,7 @@ function Enemy(key, x, y, app) {
   this.wp = null;
   this.wpT = 0;
   this.randFireT = TZ.u.rand(1.5, 3);
+  this.contactCd = 0;
   this.targetBase = app.mode === 'adventure' && app.baseDef &&
     (key === 'grunt' || key === 'heavy' || key === 'kamikaze') && Math.random() < 0.25;
 }
@@ -406,9 +413,11 @@ Enemy.prototype.update = function (dt, app) {
     this.randFireT = TZ.u.rand(1.2, 2.8);
   }
 
-  if (dist < this.radius + p.w * 0.5) {
+  if (this.contactCd > 0) this.contactCd -= dt;
+  if (p && p.alive && this.contactCd <= 0 && TZ.u.dist(this.x, this.y, p.x, p.y) < this.radius + p.w * 0.5) {
     p.takeDamage(this.attack);
     this.shootCd += 1;
+    this.contactCd = 1;
   }
 };
 

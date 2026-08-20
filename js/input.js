@@ -26,7 +26,20 @@ TZ.Input = (function () {
     down[e.code] = true;
   });
   addEventListener('keyup', function (e) { down[e.code] = false; });
-  addEventListener('blur', function () { for (var k in down) down[k] = false; });
+
+  function hardReset() {
+    for (var k in down) down[k] = false;
+    pressed = {};
+    joy.active = false; joy.id = null;
+    aim.active = false; aim.id = null;
+    skillTap = false;
+    mouse.left = false; mouse.right = false;
+  }
+  addEventListener('blur', hardReset);
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) hardReset();
+  });
+
   addEventListener('mousemove', function (e) {
     if (touchMode) return;
     var cv = document.getElementById('gameCanvas');
@@ -50,12 +63,19 @@ TZ.Input = (function () {
   });
   addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
-  addEventListener('touchstart', function (e) {
-    touchMode = true;
-    if (document.querySelector('.screen.active')) return;
-    if (uiTarget(e)) return;
+  function reconcile(e) {
     for (var i = 0; i < e.changedTouches.length; i++) {
-      var t = e.changedTouches[i];
+      var ct = e.changedTouches[i];
+      if (joy.active && ct.identifier === joy.id) { joy.active = false; joy.id = null; }
+      if (aim.active && ct.identifier === aim.id) { aim.active = false; aim.id = null; }
+    }
+    var present = {};
+    for (var i = 0; i < e.touches.length; i++) present[e.touches[i].identifier] = true;
+    if (joy.active && !present[joy.id]) { joy.active = false; joy.id = null; }
+    if (aim.active && !present[aim.id]) { aim.active = false; aim.id = null; }
+    for (var i = 0; i < e.touches.length; i++) {
+      var t = e.touches[i];
+      if (t.identifier === joy.id || t.identifier === aim.id) continue;
       var pt = cvPoint(t);
       if (pt.x >= 480) {
         if (!aim.active) { aim.active = true; aim.id = t.identifier; aim.x = pt.x; aim.y = pt.y; }
@@ -63,6 +83,13 @@ TZ.Input = (function () {
         if (!joy.active) { joy.active = true; joy.id = t.identifier; joy.ox = pt.x; joy.oy = pt.y; joy.x = pt.x; joy.y = pt.y; }
       }
     }
+  }
+
+  addEventListener('touchstart', function (e) {
+    touchMode = true;
+    if (document.querySelector('.screen.active')) return;
+    if (uiTarget(e)) return;
+    reconcile(e);
     e.preventDefault();
   }, { passive:false });
   addEventListener('touchmove', function (e) {
@@ -73,23 +100,16 @@ TZ.Input = (function () {
       if (joy.active && t.identifier === joy.id) { joy.x = pt.x; joy.y = pt.y; }
       else if (aim.active && t.identifier === aim.id) { aim.x = pt.x; aim.y = pt.y; }
     }
+    if (!joy.active && !aim.active) reconcile(e);
     e.preventDefault();
   }, { passive:false });
   addEventListener('touchend', function (e) {
-    for (var i = 0; i < e.changedTouches.length; i++) {
-      var t = e.changedTouches[i];
-      if (joy.active && t.identifier === joy.id) { joy.active = false; joy.id = null; }
-      if (aim.active && t.identifier === aim.id) { aim.active = false; aim.id = null; }
-    }
-    e.preventDefault();
+    reconcile(e);
+    if (!document.querySelector('.screen.active')) e.preventDefault();
   });
   addEventListener('touchcancel', function (e) {
-    for (var i = 0; i < e.changedTouches.length; i++) {
-      var t = e.changedTouches[i];
-      if (joy.active && t.identifier === joy.id) { joy.active = false; joy.id = null; }
-      if (aim.active && t.identifier === aim.id) { aim.active = false; aim.id = null; }
-    }
-    e.preventDefault();
+    reconcile(e);
+    if (!document.querySelector('.screen.active')) e.preventDefault();
   });
 
   function axis() {
@@ -103,9 +123,11 @@ TZ.Input = (function () {
       var dispW = cv.getBoundingClientRect().width || cv.width;
       var R = 46 * (cv.width / dispW);
       var dx = joy.x - joy.ox, dy = joy.y - joy.oy;
-      var l = Math.hypot(dx, dy);
-      var k = Math.min(1, l / R);
-      if (l > 1) { x += dx / l * k; y += dy / l * k; }
+      if (isFinite(dx) && isFinite(dy)) {
+        var l = Math.hypot(dx, dy);
+        var k = Math.min(1, l / R);
+        if (l > 1) { x += dx / l * k; y += dy / l * k; }
+      }
     }
     var L = Math.hypot(x, y);
     if (L > 1) { x /= L; y /= L; }
@@ -117,6 +139,8 @@ TZ.Input = (function () {
     pressed[code] = false;
     return !!v;
   }
+
+  function clearPressed() { pressed = {}; }
 
   function triggerSkill() { skillTap = true; }
 
@@ -131,6 +155,7 @@ TZ.Input = (function () {
     down: down,
     axis: axis,
     consume: consume,
+    clearPressed: clearPressed,
     mouse: function () { return mouse; },
     aimTouch: function () { return aim; },
     joystick: function () { return joy; },
